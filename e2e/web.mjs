@@ -64,6 +64,49 @@ try {
   check("O1 output is cut", "10000 true", `${flood.stdout.length} ${flood.truncated}`);
 
 
+  await run("secret = 42\nopen('/out/a.txt', 'w').write('a')");
+  const other = await run("secret", {}, "b");
+  check("D7 globals do not cross dens", true, /NameError/.test(other.error?.message ?? ""));
+  check("D7 files do not cross dens", "[]", JSON.stringify(await call(() => window.dens.b.list())));
+
+  const spoofed = await call(async () => {
+    window.postMessage({ t: "reply", v: 1, reply: { id: 99, stdout: "forged", stderr: "", result: "forged", error: null, truncated: false, files: [], durationMs: 0 } }, "*");
+    for (const frame of document.querySelectorAll("iframe")) frame.contentWindow.postMessage({ t: "init", v: 1, assets: {} }, "*", [new MessageChannel().port2]);
+    return (await window.dens.a.run("6*7")).result;
+  });
+  check("X1 fake messages are ignored", "42", spoofed);
+
+  const missing = await call(() =>
+    window.foxden.openDen({ name: "missing", runtime: window.foxden.iframeRuntime({ denUrl: "den/den.html", pyodideUrl: "nope/", loadTimeoutMs: 10_000 }) }).then(() => "opened", (e) => e.name),
+  );
+  check("L1 missing Pyodide files reject", "DenLoadError", missing);
+  const forced = await call(() =>
+    window.foxden.openDen({ name: "forced", runtime: window.foxden.iframeRuntime({ denUrl: "den/den.html", pyodideUrl: "pyodide/", isolation: "manifest-sandbox" }) }).then(() => "opened", (e) => e.message),
+  );
+  check("I1 same-origin den page refuses to start", true, /not isolated.*refused to start/.test(forced));
+  const memory = await run("blocks = []\nwhile True: blocks.append(bytearray(256 * 1024 ** 2))", { timeoutMs: 60_000 });
+  record.memoryError = memory.error;
+  check("R1 memory blowup is an error", true, memory.error?.kind === "python" || memory.error?.kind === "crashed");
+  check("R1 next run works", "2", (await run("1+1")).result);
+
+  await call(async () => {
+    const { openDen, iframeRuntime, idbStore } = window.foxden;
+    const den = await openDen({ name: "kept", store: idbStore(), runtime: iframeRuntime({ denUrl: "den/den.html", pyodideUrl: "pyodide/" }) });
+    await den.writeFile("/drop/kept.csv", "a,b\n1,2\n");
+    await den.close();
+  });
+  await page.reload();
+  await poll(page, () => typeof window.foxden?.openDen === "function");
+  const reopened = await call(async () => {
+    const { openDen, idbStore } = window.foxden;
+    // No Python is needed to read a file back, so this runtime is a stub.
+    // It runs in the page, so it cannot move to the outer scope.
+    // oxlint-disable-next-line unicorn/consistent-function-scoping
+    const runtime = () => ({ start: async () => ({ kind: "none", isolation: "none", loadMs: 0 }), run: async () => ({}), close() {} });
+    const den = await openDen({ name: "kept", store: idbStore(), runtime });
+    return new TextDecoder().decode(await den.readFile("/drop/kept.csv"));
+  });
+  check("B1 files survive a page reload", "a,b\n1,2\n", reopened);
 } catch (error) {
   record.error = error instanceof Error ? error.message : String(error);
 } finally {
@@ -71,7 +114,7 @@ try {
   await site.close();
   probe.close();
 }
-record.passed = !record.error && record.checks.length >= 12 && record.checks.every((c) => c.ok);
+record.passed = !record.error && record.checks.length >= 20 && record.checks.every((c) => c.ok);
 const path = writeArtifact("artifacts", "e2e-web", record);
 for (const c of record.checks) console.log(`${c.ok ? "ok " : "BAD"} ${c.name}: ${JSON.stringify(c.actual)}`);
 console.log(`${record.passed ? "PASS" : "FAIL"}${record.error ? `: ${record.error}` : ""} | Pyodide load ${record.pyodideLoadMs} ms | ${path}`);

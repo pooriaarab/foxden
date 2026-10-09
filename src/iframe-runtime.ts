@@ -8,12 +8,19 @@ export interface IframeRuntimeOptions {
   denUrl: string | URL;
   /** URL of a folder with pyodide.asm.wasm, python_stdlib.zip and pyodide-lock.json. */
   pyodideUrl: string | URL;
+  /**
+   * "manifest-sandbox": a plain iframe of a page in the manifest `sandbox` key (Firefox 154+).
+   * "iframe-sandbox": an iframe with `sandbox="allow-scripts"` (websites, Firefox 153).
+   * "auto" (default): manifest-sandbox when the extension lists den.html there, else iframe-sandbox.
+   */
+  isolation?: Isolation | "auto";
   /** Default 60000. */
   loadTimeoutMs?: number;
   /** Where to put the hidden iframe. Default document.body. */
   container?: HTMLElement;
 }
 
+export type Isolation = "manifest-sandbox" | "iframe-sandbox";
 type Assets = { wasm: ArrayBuffer; stdlib: ArrayBuffer; lock: unknown };
 
 const cache = new Map<string, Promise<Assets>>();
@@ -36,6 +43,13 @@ function assets(base: URL): Promise<Assets> {
   return pending;
 }
 
+function inManifestSandbox(den: URL): boolean {
+  if (location.protocol !== "moz-extension:" || den.origin !== location.origin) return false;
+  const g = globalThis as { browser?: { runtime?: { getManifest?: () => { sandbox?: { pages?: unknown } } } } };
+  const pages = g.browser?.runtime?.getManifest?.().sandbox?.pages;
+  return Array.isArray(pages) && pages.some((p) => typeof p === "string" && new URL(p, `${location.origin}/`).pathname === den.pathname);
+}
+
 function within<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const late = new Promise<never>((_, reject) => {
@@ -53,12 +67,26 @@ class IframeRuntime implements DenRuntime {
 
   async start(): Promise<RuntimeInfo> {
     const den = new URL(this.options.denUrl, location.href);
+    const mode = this.options.isolation ?? "auto";
+    const first: Isolation = mode === "auto" ? (inManifestSandbox(den) ? "manifest-sandbox" : "iframe-sandbox") : mode;
+    try {
+      return await this.#open(den, first);
+    } catch (error) {
+      // Firefox 153 ignores the manifest sandbox key, so the den page refuses
+      // to start there. In auto mode, try again with the sandbox attribute.
+      if (mode !== "auto" || first !== "manifest-sandbox" || !String((error as Error).message).startsWith("not isolated")) throw error;
+      this.close();
+      return this.#open(den, "iframe-sandbox");
+    }
+  }
+
+  async #open(den: URL, isolation: Isolation): Promise<RuntimeInfo> {
     const timeout = this.options.loadTimeoutMs ?? 60_000;
     const started = performance.now();
     const files = await assets(new URL(this.options.pyodideUrl, location.href));
     const frame = document.createElement("iframe");
     this.#frame = frame;
-    frame.setAttribute("sandbox", "allow-scripts");
+    if (isolation === "iframe-sandbox") frame.setAttribute("sandbox", "allow-scripts");
     frame.hidden = true;
     frame.title = "foxden sandbox";
     frame.src = den.href;
@@ -82,7 +110,7 @@ class IframeRuntime implements DenRuntime {
     frame.contentWindow?.postMessage({ t: "init", v: 1, assets: files }, "*", [port2]);
     const m = await within(ready, timeout, `Pyodide did not load in ${timeout} ms.`);
     if (m.origin !== "null" || m.extensionApi) throw new Error(`not isolated: the den page has origin ${m.origin}.`);
-    return { kind: "pyodide-iframe", isolation: "iframe-sandbox", loadMs: Math.round(performance.now() - started) };
+    return { kind: "pyodide-iframe", isolation, loadMs: Math.round(performance.now() - started) };
   }
 
   run(request: RunRequest): Promise<RunReply> {

@@ -5,6 +5,8 @@ import type { Assets, WorkerIn, WorkerOut } from "./worker.js";
 
 declare const FOXDEN_WORKER_SOURCE: string;
 
+const g = globalThis as { browser?: { runtime?: { id?: unknown } }; chrome?: { runtime?: { id?: unknown } } };
+const extensionApi = typeof g.browser?.runtime?.id === "string" || typeof g.chrome?.runtime?.id === "string";
 let port: MessagePort | null = null;
 let assets: Assets;
 let worker: Worker;
@@ -77,6 +79,13 @@ window.addEventListener("message", (e) => {
   const data = e.data as { t?: unknown; v?: unknown; assets?: Partial<Assets> } | null;
   if (port || e.source !== window.parent || data?.t !== "init" || data.v !== 1 || !e.ports[0]) return;
   port = e.ports[0];
+  // Firefox 153 ignores the manifest sandbox key, and a host can forget the
+  // sandbox attribute. Either way this page would share an origin or hold
+  // extension APIs, so it stops here.
+  if (self.origin !== "null" || extensionApi) {
+    send({ t: "load-error", v: 1, message: `not isolated: the den page has origin ${self.origin} and extension API ${extensionApi}, so it refused to start.` });
+    return;
+  }
   const a = data.assets;
   if (!(a?.wasm instanceof ArrayBuffer) || !(a.stdlib instanceof ArrayBuffer)) {
     send({ t: "load-error", v: 1, message: "The init message has no Pyodide files." });
@@ -85,7 +94,7 @@ window.addEventListener("message", (e) => {
   assets = { wasm: a.wasm, stdlib: a.stdlib, lock: a.lock };
   ready = spawn();
   ready.then(
-    (loadMs) => send({ t: "ready", v: 1, origin: self.origin, extensionApi: false, loadMs }),
+    (loadMs) => send({ t: "ready", v: 1, origin: self.origin, extensionApi, loadMs }),
     (error: Error) => send({ t: "load-error", v: 1, message: `Pyodide did not load: ${error.message}` }),
   );
   port.addEventListener("message", (m) => {
