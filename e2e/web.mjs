@@ -37,6 +37,9 @@ try {
   const run = (code, opts = {}, den = "a") => call((a) => window.dens[a.den].run(a.code, a.opts), { code, opts, den });
 
   check("run 1+1", "2", (await run("1+1")).result);
+  check("result is the repr of a float", "30.0", (await run("30.0")).result);
+  check("result is the repr of a str", "'abc'", (await run("'abc'")).result);
+  check("no result for None", null, (await run("None")).result);
   for (const [name, code] of Object.entries(probeCode(probe.host))) {
     const r = await run(code, { timeoutMs: 20_000 });
     check(`${name} fails`, true, r.error !== null);
@@ -103,7 +106,7 @@ try {
   await site.close();
   probe.close();
 }
-record.passed = !record.error && record.checks.length >= 20 && record.checks.every((c) => c.ok);
+record.passed = !record.error && record.checks.length >= 23 && record.checks.every((c) => c.ok);
 const path = writeArtifact("artifacts", "e2e-web", record);
 for (const c of record.checks) console.log(`${c.ok ? "ok " : "BAD"} ${c.name}: ${JSON.stringify(c.actual)}`);
 console.log(`${record.passed ? "PASS" : "FAIL"}${record.error ? `: ${record.error}` : ""} | Pyodide load ${record.pyodideLoadMs} ms | ${path}`);
