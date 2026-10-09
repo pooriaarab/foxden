@@ -19,6 +19,16 @@ const scope = self as unknown as {
   fetch: typeof fetch;
 };
 let py: PyodideAPI;
+let runCode: (code: string, globals: unknown) => Promise<string | undefined>;
+
+// Runs the code in the den globals and makes repr() in Python, before
+// Pyodide turns the value into a JavaScript one (30.0 would become 30).
+const RUNNER = `
+from pyodide.code import eval_code_async
+async def run(code, ns):
+    value = await eval_code_async(code, ns)
+    return None if value is None else repr(value)
+`;
 
 async function load(assets: Assets) {
   const started = performance.now();
@@ -36,6 +46,9 @@ async function load(assets: Assets) {
   } finally {
     scope.fetch = realFetch;
   }
+  const helper = py.toPy({});
+  py.runPython(RUNNER, { globals: helper });
+  runCode = helper.get("run");
   for (const folder of DEN_FOLDERS) {
     py.FS.mkdirTree(folder);
     py.FS.mount(py.FS.filesystems.MEMFS, {}, folder);
@@ -93,9 +106,7 @@ async function run(req: RunRequest): Promise<RunReply> {
   let result: string | null = null;
   let error: RunReply["error"] = null;
   try {
-    const value: unknown = await py.runPythonAsync(req.code);
-    if (value !== undefined) result = String(py.globals.get("repr")(value));
-    if (value && typeof (value as { destroy?: () => void }).destroy === "function") (value as { destroy: () => void }).destroy();
+    result = (await runCode(req.code, py.globals)) ?? null;
   } catch (e) {
     // A PythonError is the code's own exception. Anything else (for example
     // a Pyodide fatal error after out of memory) means this worker is broken.

@@ -1,0 +1,115 @@
+{
+  "startedAt": "2026-10-09T04:35:12.181Z",
+  "checks": [
+    {
+      "name": "E3 isolation",
+      "expected": "manifest-sandbox",
+      "actual": "manifest-sandbox",
+      "ok": true
+    },
+    {
+      "name": "network badge",
+      "expected": "Network: off",
+      "actual": "Network: off",
+      "ok": true
+    },
+    {
+      "name": "E1 drop names stay in /drop",
+      "expected": "/drop/.._evil_.._name.csv /drop/sales.csv",
+      "actual": "/drop/.._evil_.._name.csv /drop/sales.csv",
+      "ok": true
+    },
+    {
+      "name": "CSV run",
+      "expected": true,
+      "actual": true,
+      "ok": true
+    },
+    {
+      "name": "output file listed for download",
+      "expected": true,
+      "actual": true,
+      "ok": true
+    },
+    {
+      "name": "shell grep",
+      "expected": "2\n",
+      "actual": "2\n",
+      "ok": true
+    },
+    {
+      "name": "E4 N1 fetch fails",
+      "expected": true,
+      "actual": true,
+      "ok": true
+    },
+    {
+      "name": "E4 N2 XMLHttpRequest fails",
+      "expected": true,
+      "actual": true,
+      "ok": true
+    },
+    {
+      "name": "E4 N3 WebSocket fails",
+      "expected": true,
+      "actual": true,
+      "ok": true
+    },
+    {
+      "name": "E4 N4 EventSource fails",
+      "expected": true,
+      "actual": true,
+      "ok": true
+    },
+    {
+      "name": "E4 N4 import() fails",
+      "expected": true,
+      "actual": true,
+      "ok": true
+    },
+    {
+      "name": "E4 N4 nested worker fails",
+      "expected": true,
+      "actual": true,
+      "ok": true
+    },
+    {
+      "name": "E4 probe server got no request",
+      "expected": "[]",
+      "actual": "[]",
+      "ok": true
+    },
+    {
+      "name": "E4 endless loop stops",
+      "expected": true,
+      "actual": true,
+      "ok": true
+    },
+    {
+      "name": "E4 next run works",
+      "expected": true,
+      "actual": true,
+      "ok": true
+    },
+    {
+      "name": "B1 files survive a reload",
+      "expected": true,
+      "actual": true,
+      "ok": true
+    }
+  ],
+  "firefox": "firefox/157.0.1",
+  "status": "Python is ready (2.1 s). Isolation: manifest-sandbox.",
+  "pyodideLoadMs": 2053,
+  "csvOutput": "/drop/sales.csv: 4 rows\nsum of amount: 400\n",
+  "network": {
+    "N1 fetch": " 422, in run_async\n    await coroutine\n  File \"<exec>\", line 2, in <module>\npyodide.ffi.JsException: TypeError: NetworkError when attempting to fetch resource.\n",
+    "N2 XMLHttpRequest": "\n  File \"blob:null/f1025214-7518-4e81-bdd6-708895d8c507\", line 20491, in JsvFunction_CallBound\npyodide.ffi.JsException: NetworkError: A network error occurred.\n",
+    "N3 WebSocket": "x805e0006 (NS_ERROR_CONTENT_BLOCKED)\"  location: \"JS frame :: blob:null/f1025214-7518-4e81-bdd6-708895d8c507 :: JsvFunction_Construct :: line 20511\"  data: no]\n",
+    "N4 EventSource": "locals)\n  File \"/lib/python314.zip/_pyodide/_base.py\", line 422, in run_async\n    await coroutine\n  File \"<exec>\", line 5, in <module>\nAssertionError: not open\n",
+    "N4 import()": "  File \"blob:null/f1025214-7518-4e81-bdd6-708895d8c507\", line 20491, in JsvFunction_CallBound\npyodide.ffi.JsException: EvalError: call to eval() blocked by CSP\n",
+    "N4 nested worker": "p/_pyodide/_base.py\", line 422, in run_async\n    await coroutine\n  File \"<exec>\", line 6, in <module>\nRuntimeError: a nested worker cannot report a result here\n"
+  },
+  "timeoutStopMs": 2272,
+  "passed": true
+}
