@@ -1,6 +1,6 @@
 {
   "name": "foxden-sandbox",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A sandbox in a browser tab that runs Python and shell with no network.",
   "type": "module",
   "license": "MIT",
@@ -28,9 +28,10 @@
     "typecheck": "tsc --noEmit",
     "lint": "oxlint --deny-warnings",
     "test": "vitest run --passWithNoTests",
-    "ci:local": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm build:ext && pnpm lint:ext",
+    "ci:local": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm build:ext && pnpm lint:ext && pnpm check:amo",
     "build:ext": "node scripts/build-ext.mjs",
     "lint:ext": "node scripts/lint-ext.mjs",
+    "check:amo": "node scripts/amo-listing.mjs check",
     "e2e": "pnpm build && pnpm build:ext && node e2e/run.mjs",
     "e2e:web": "pnpm build && pnpm build:ext && node e2e/web.mjs"
   },

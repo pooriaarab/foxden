@@ -30,7 +30,8 @@ await build({
   target: "firefox153",
   logLevel: "warning",
 });
-for (const file of files.filter((f) => !f.endsWith(".js"))) cpSync(`extension/${file}`, `dist-ext/${file}`, { recursive: true });
+// amo-metadata.json is the AMO listing, not a part of the add-on.
+for (const file of files.filter((f) => !f.endsWith(".js") && f !== "amo-metadata.json")) cpSync(`extension/${file}`, `dist-ext/${file}`, { recursive: true });
 cpSync("dist/den", "dist-ext/den", { recursive: true });
 for (const file of needed.slice(2)) cpSync(file, `dist-ext/pyodide/${file.split("/").pop()}`);
 writeFileSync("dist-ext/pyodide/NOTICE.txt", `Pyodide ${pyodide.version}, unmodified, from the npm package "pyodide".\nLicense: MPL-2.0. Source: https://github.com/pyodide/pyodide\n`);
