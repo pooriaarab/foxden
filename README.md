@@ -11,8 +11,10 @@ a worker inside a sandboxed page. That page has an opaque origin and the CSP
 ## Install
 
 ```bash
-npm i foxden
+npm i @pooriaarab/foxden
 ```
+
+The npm package is `@pooriaarab/foxden`: npm refuses the plain name `foxden` as too similar to an existing package (`boxen`).
 
 foxden installs `pyodide` 314.0.7 next to it. Your page must serve two
 folders: the sandbox page from foxden, and three files from Pyodide. Copy them
@@ -20,7 +22,7 @@ when you build:
 
 ```bash
 mkdir -p public/foxden/pyodide
-cp -r node_modules/foxden/dist/den public/foxden/
+cp -r node_modules/@pooriaarab/foxden/dist/den public/foxden/
 cp node_modules/pyodide/pyodide.asm.wasm node_modules/pyodide/python_stdlib.zip node_modules/pyodide/pyodide-lock.json public/foxden/pyodide/
 ```
 
@@ -31,7 +33,7 @@ version, and files from another version do not work with it. With pnpm,
 ## Example
 
 ```js
-import { idbStore, iframeRuntime, openDen } from "foxden";
+import { idbStore, iframeRuntime, openDen } from "@pooriaarab/foxden";
 
 const den = await openDen({
   name: "notes",
@@ -152,7 +154,7 @@ and runs nothing. To write files, use Python.
 
 ```ts
 import { openDen, iframeRuntime, idbStore, memoryStore, runShell, normalizePath,
-         encodeSnapshot, decodeSnapshot } from "foxden";
+         encodeSnapshot, decodeSnapshot } from "@pooriaarab/foxden";
 ```
 
 | Name | What it does |
