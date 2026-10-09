@@ -4,7 +4,7 @@ import type { DenRuntime, RuntimeInfo } from "./den.js";
 import { parseDenMessage, type RunReply, type RunRequest } from "./protocol.js";
 
 export interface IframeRuntimeOptions {
-  /** URL of den.html (from foxden/dist/den/). */
+  /** URL of den.html (from @pooriaarab/foxden/dist/den/). */
   denUrl: string | URL;
   /** URL of a folder with pyodide.asm.wasm, python_stdlib.zip and pyodide-lock.json. */
   pyodideUrl: string | URL;

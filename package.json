@@ -1,5 +1,5 @@
 {
-  "name": "foxden",
+  "name": "@pooriaarab/foxden",
   "version": "0.1.0",
   "description": "A sandbox in a browser tab that runs Python and shell with no network.",
   "type": "module",
