@@ -14,6 +14,9 @@ a worker inside a sandboxed page. That page has an opaque origin and the CSP
 npm i foxden-sandbox
 ```
 
+Install the add-on from AMO: [addons.mozilla.org/firefox/addon/foxden-sandbox](https://addons.mozilla.org/firefox/addon/foxden-sandbox/)
+(pending AMO review; the link works after approval).
+
 The npm package is `foxden-sandbox`: npm refuses the plain name `foxden` as too similar to an existing package (boxen).
 
 

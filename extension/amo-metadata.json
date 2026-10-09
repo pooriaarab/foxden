@@ -1,0 +1,28 @@
+{
+  "default_locale": "en-US",
+  "slug": "foxden-sandbox",
+  "name": {
+    "en-US": "foxden — Python in a sandbox with no network"
+  },
+  "summary": {
+    "en-US": "Run Python on your files in a browser tab with no network. Drop a CSV, run code, and download the results. The code runs in a sandboxed page that cannot reach any server, so your files stay on this device."
+  },
+  "description": {
+    "en-US": "foxden is the reference add-on for the foxden library. It opens a Space: a page with a folder of files and a Python that has no network.\n\n**Who it is for:** people who want to work on a CSV or a text file with Python without an upload site, and developers who want a safe place to run code that an AI agent wrote.\n\n**What it does**\n\n- Opens the Space when you click the toolbar button.\n- Puts the files that you drop or choose in `/drop`. The files stay in the browser's IndexedDB across reloads.\n- Runs Python (Pyodide, CPython compiled to WebAssembly) with a time limit. Only the Python standard library is there.\n- Runs a small shell with `ls`, `cat`, `head`, `wc`, `grep` and `echo` on the files.\n- Offers the files that the code writes to `/out` as downloads.\n\n**How the sandbox works:** the code runs in a worker inside a sandboxed extension page. That page has an opaque origin, no extension APIs, and the content security policy `connect-src 'none'`, so the code cannot reach any server. The badge says \"Network: off\".\n\n**What leaves your computer:** nothing. Pyodide is inside the add-on, so it downloads nothing. The add-on has no server and no analytics.\n\n**Permissions**\n\n- Unlimited storage: the files in the Space can pass the normal storage limit.\n\nThe `sandbox` manifest key needs Firefox 154. On Firefox 153 the Space uses an iframe with the sandbox attribute.\n\nThe source code is MIT licensed."
+  },
+  "categories": {
+    "firefox": [
+      "web-development"
+    ]
+  },
+  "homepage": {
+    "en-US": "https://github.com/pooriaarab/foxden"
+  },
+  "support_url": {
+    "en-US": "https://github.com/pooriaarab/foxden/issues"
+  },
+  "version": {
+    "license": "MIT",
+    "approval_notes": "The uploaded source.zip is the git tree of this release. To build: install Node 24 and pnpm 11 (corepack enable), run `pnpm install --frozen-lockfile`, then `pnpm build && pnpm build:ext`. The output is dist-ext/. esbuild bundles extension/*.js, and scripts/build-den.mjs bundles the sandbox page dist/den/den.js from src/page/ with its worker (and the Pyodide loader from the pyodide npm package) inside it as a string. The sandbox page starts the worker from a blob of that string, because an opaque origin cannot load a worker from a URL; the sandbox CSP keeps connect-src 'none'. The files in dist-ext/pyodide/ (pyodide.asm.wasm, python_stdlib.zip, pyodide-lock.json) are copied unmodified from the pyodide npm package 314.0.7. To try it: click the toolbar button, drop a CSV file, and press Run; the sample code sums each column and writes /out/sums.csv. No account is needed."
+  }
+}
