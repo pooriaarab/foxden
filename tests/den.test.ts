@@ -1,4 +1,4 @@
-// Failure modes D1-D14 in docs/failure-modes.md, with a fake runtime.
+// Failure modes D1-D15 in docs/failure-modes.md, with a fake runtime.
 import { describe, expect, it } from "vitest";
 import { type DenRuntime, memoryStore, openDen, type DenStore } from "../src/den.js";
 import type { RunReply, RunRequest } from "../src/protocol.js";
@@ -204,6 +204,18 @@ describe("den", () => {
     expect(r.stderr.length).toBeLessThanOrEqual(100);
     expect(r.truncated).toBe(true);
     await den.close();
+  });
+
+  it("D15: a snapshot over maxDenBytes is refused by openDen", async () => {
+    const source = await openDen({ name: name(), runtime: fake().factory });
+    await source.writeFile("/drop/big.bin", new Uint8Array(2000));
+    const snap = await source.snapshot();
+    await source.close();
+    const store = memoryStore();
+    const n = name();
+    await expect(openDen({ name: n, runtime: fake().factory, store, snapshot: snap, maxDenBytes: 1000 })).rejects.toMatchObject({ name: "DenError" });
+    expect(await store.load(n)).toBeNull();
+    await (await openDen({ name: n, runtime: fake().factory, store })).close();
   });
 
   it("D14: bad den names are refused", async () => {

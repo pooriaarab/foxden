@@ -89,6 +89,7 @@ runtime, and tests use a fake one.
 | D12 | The store cannot save (disk full, quota) | `writeFile` rejects and the den keeps its old files | `tests/den.test.ts` |
 | D13 | The sandbox sends back stdout larger than `maxOutputBytes` | The den cuts it and sets `truncated` | `tests/den.test.ts` |
 | D14 | The den name is empty, too long, or has odd characters | `openDen` rejects with `DenError` | `tests/den.test.ts` |
+| D15 | `openDen({ snapshot })` gets a snapshot larger than `maxDenBytes` | `openDen` rejects with `DenError`, as `restore()` does. Nothing is saved to the store, and the name can be opened again. | `tests/den.test.ts` |
 
 ## The sandbox page and worker (`src/page/`, `src/iframe-runtime.ts`)
 
