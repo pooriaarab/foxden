@@ -21,3 +21,17 @@ export class SnapshotError extends FoxdenError {
     super("SnapshotError", message);
   }
 }
+
+/** A den is used in a wrong way: a bad name, a name already open, or a closed den. */
+export class DenError extends FoxdenError {
+  constructor(message: string) {
+    super("DenError", message);
+  }
+}
+
+/** The runtime could not start, for example because Pyodide files are missing. */
+export class DenLoadError extends FoxdenError {
+  constructor(message: string) {
+    super("DenLoadError", message);
+  }
+}
