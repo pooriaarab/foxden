@@ -37,7 +37,8 @@ function spawn(): Promise<number> {
       else if (m?.t === "load-failed") reject(new Error(m.message));
       else if (m?.t === "reply" && parseDenMessage({ t: "reply", v: 1, reply: m.reply })) {
         finish(m.reply);
-        if (m.reply.error?.kind === "crashed") restart();
+        // A crash, or work that outlived the run, needs a fresh worker.
+        if (m.reply.error?.kind === "crashed" || m.restart) restart();
       }
     });
     worker.addEventListener("error", (e) => {

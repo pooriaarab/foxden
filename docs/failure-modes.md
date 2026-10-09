@@ -105,6 +105,8 @@ uses the demo extension.
 | N4 | Code uses `EventSource`, dynamic `import()`, or a nested worker that fetches | It fails. No request arrives. | E2E |
 | T1 | Code loops forever | The sandbox page kills the worker at `timeoutMs`. `run` returns `timeout`, the next run works, and the files stay. | E2E |
 | O1 | Code prints without end | Output stops at `maxOutputBytes` and `truncated` is true. The worker does not run out of memory. | E2E |
+| T2 | Code starts an asyncio task, or a JavaScript timer, and the run returns while it still runs | The worker cancels pending asyncio tasks before it collects files. If a task or a timer is still alive after that, the sandbox page restarts the worker (Python variables are lost, files stay) and says so on stderr. A later run never commits a file that leftover work wrote. | E2E (`e2e/web.mjs`) |
+| T3 | A run leaves no background work | Python variables stay for the next run (no needless restart) | E2E (`e2e/web.mjs`) |
 | L2 | The machine is offline | Pyodide loads anyway: every file comes from the host origin. The E2E test runs with all remote network sent to a dead proxy. | E2E |
 | W1 | foxden runs on a normal website, not in an extension | The den works in an `iframe-sandbox` iframe with the `<meta>` CSP | E2E (`e2e/web.mjs`) |
 | V1 | The last expression is a float, a string, or another Python value that JavaScript would change (`30.0` becomes `30`) | `result` is the Python `repr()` of the value, made in Python. `None` gives `null`. | E2E (`e2e/web.mjs`) |

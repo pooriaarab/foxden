@@ -253,6 +253,9 @@ not give them to extension pages. It does not use OPFS or JSPI yet.
 - Only the Python standard library is there. pandas and NumPy are not
   bundled, and the sandbox cannot download packages.
 - A timeout kills the worker, so Python variables are lost. Files stay.
+- When a run ends, foxden cancels the asyncio tasks that the code started.
+  If a task or a JavaScript timer is still alive 200 ms later, the worker
+  restarts, and Python variables are lost. Files stay.
 - Snapshots hold files only, not Python variables.
 - Each run copies every den file to the sandbox and back. Very large dens
   are slow. The default cap is 256 MiB per den.
