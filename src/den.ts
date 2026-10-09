@@ -5,6 +5,8 @@
 import { DenError, DenLoadError, PathError } from "./errors.js";
 import { normalizePath } from "./paths.js";
 import type { FileChanges, RunErrorKind, RunReply, RunRequest } from "./protocol.js";
+import { runShell, type ShellOptions, type ShellResult } from "./shell.js";
+import { decodeSnapshot, encodeSnapshot } from "./snapshot.js";
 
 export interface RuntimeInfo {
   /** The adapter, for example "pyodide-iframe". */
@@ -35,6 +37,8 @@ export interface OpenDenOptions {
   runtime: () => DenRuntime;
   /** Default: memoryStore(). Use idbStore() to keep files across page loads. */
   store?: DenStore;
+  /** Start from these snapshot bytes instead of the stored files. */
+  snapshot?: Uint8Array;
   /** The most bytes all files of the den can hold. Default 256 MiB. */
   maxDenBytes?: number;
   /** How long past timeoutMs to wait for the runtime before the den kills it. Default 5000. */
@@ -63,10 +67,14 @@ export interface Den {
   readonly name: string;
   readonly info: RuntimeInfo;
   run(code: string, options?: RunOptions): Promise<RunResult>;
+  sh(command: string, options?: ShellOptions): Promise<ShellResult>;
   writeFile(path: string, data: string | Uint8Array): Promise<void>;
   readFile(path: string): Promise<Uint8Array>;
   deleteFile(path: string): Promise<void>;
   list(): Promise<{ path: string; size: number }[]>;
+  snapshot(): Promise<Uint8Array>;
+  restore(snapshot: Uint8Array): Promise<void>;
+  fork(options: { name: string }): Promise<Den>;
   close(): Promise<void>;
 }
 
@@ -92,7 +100,11 @@ export async function openDen(options: OpenDenOptions): Promise<Den> {
   open.add(name);
   try {
     const store = options.store ?? memoryStore();
-    const files = (await store.load(name)) ?? new Map<string, Uint8Array>();
+    let files = (await store.load(name)) ?? new Map<string, Uint8Array>();
+    if (options.snapshot) {
+      files = (await decodeSnapshot(options.snapshot)).files;
+      await store.save(name, files);
+    }
     const runtime = options.runtime();
     let info: RuntimeInfo;
     try {
@@ -229,6 +241,11 @@ class DenImpl implements Den {
     };
   }
 
+  async sh(command: string, options?: ShellOptions): Promise<ShellResult> {
+    this.#check();
+    return runShell(command, this.#files, options);
+  }
+
   async writeFile(path: string, data: string | Uint8Array): Promise<void> {
     const p = normalizePath(path);
     const body = typeof data === "string" ? new TextEncoder().encode(data) : data.slice();
@@ -255,6 +272,19 @@ class DenImpl implements Den {
   async list() {
     this.#check();
     return [...this.#files].map(([path, body]) => ({ path, size: body.length })).toSorted((a, b) => (a.path < b.path ? -1 : 1));
+  }
+
+  async snapshot(): Promise<Uint8Array> {
+    this.#check();
+    return encodeSnapshot(this.name, this.#files);
+  }
+
+  restore(snapshot: Uint8Array): Promise<void> {
+    return this.#enqueue(async () => this.#commit((await decodeSnapshot(snapshot)).files));
+  }
+
+  async fork({ name }: { name: string }): Promise<Den> {
+    return openDen({ ...this.options, name, snapshot: await this.snapshot() });
   }
 
   async close(): Promise<void> {
