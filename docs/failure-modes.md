@@ -118,3 +118,15 @@ uses the demo extension.
 |---|---|---|---|
 | B1 | The page reloads or the browser restarts | `openDen` with `idbStore()` gets the same files back | E2E |
 | B2 | IndexedDB is not there (Node, a sandboxed frame, some private modes) | `idbStore()` calls reject with a `DenError` that says so, so `openDen` fails before it starts a runtime | `tests/idb-store.test.ts` |
+
+## The demo extension (`extension/`)
+
+The Space page is a tab where a person drops files and runs Python.
+`e2e/run.mjs` drives it in real Firefox and writes `artifacts/e2e-<date>.json`.
+
+| # | Failure mode | Wanted behaviour | Test |
+|---|---|---|---|
+| E1 | A dropped file name holds `/`, `\` or `..` | The file is saved under `/drop` with those characters replaced | E2E |
+| E2 | The extension build has no Pyodide files or no `den/` folder | `pnpm build:ext` stops with an error that names the missing file | E2E (the build runs first) |
+| E3 | The `sandbox` manifest key does not work in this Firefox | The Space page shows the isolation it got. The E2E test expects `manifest-sandbox` on Firefox 154+. | E2E |
+| E4 | Code in the Space page tries the network, or loops forever | Rows N1 and T1 hold inside the extension too | E2E |

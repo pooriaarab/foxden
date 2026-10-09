@@ -1,10 +1,9 @@
 // The website E2E test: serve foxden on a plain http page, attack the sandbox
 // in real Firefox, write artifacts/e2e-web-<date>.json. Usage: pnpm e2e:web.
 import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { createServer } from "node:http";
 import { build } from "esbuild";
 import { launch, poll, serve, writeArtifact } from "create-foxkit/e2e";
-import { deadProxy, probeCode } from "./probe.mjs";
+import { deadProxy, probeCode, startProbe } from "./probe.mjs";
 
 const root = "dist-web";
 rmSync(root, { recursive: true, force: true });
@@ -14,17 +13,7 @@ cpSync("dist/den", `${root}/den`, { recursive: true });
 for (const f of ["pyodide.asm.wasm", "python_stdlib.zip", "pyodide-lock.json"]) cpSync(`node_modules/pyodide/${f}`, `${root}/pyodide/${f}`);
 await build({ entryPoints: ["src/index.ts"], bundle: true, format: "iife", globalName: "foxden", outfile: `${root}/host.js`, logLevel: "warning" });
 
-const hits = [];
-const probe = createServer((req, res) => {
-  hits.push(`${req.method} ${req.url}`);
-  res.writeHead(200, { "access-control-allow-origin": "*" }).end("leak");
-});
-probe.on("upgrade", (req, socket) => {
-  hits.push(`UPGRADE ${req.url}`);
-  socket.destroy();
-});
-await new Promise((done) => probe.listen(0, "127.0.0.1", done));
-const probeUrl = `127.0.0.1:${probe.address().port}`;
+const probe = await startProbe();
 
 const record = { startedAt: new Date().toISOString(), checks: [] };
 const check = (name, expected, actual) => record.checks.push({ name, expected, actual, ok: actual === expected });
@@ -48,12 +37,12 @@ try {
   const run = (code, opts = {}, den = "a") => call((a) => window.dens[a.den].run(a.code, a.opts), { code, opts, den });
 
   check("run 1+1", "2", (await run("1+1")).result);
-  for (const [name, code] of Object.entries(probeCode(probeUrl))) {
+  for (const [name, code] of Object.entries(probeCode(probe.host))) {
     const r = await run(code, { timeoutMs: 20_000 });
     check(`${name} fails`, true, r.error !== null);
   }
   await new Promise((done) => setTimeout(done, 1500));
-  check("N1-N4 probe server got no request", "[]", JSON.stringify(hits));
+  check("N1-N4 probe server got no request", "[]", JSON.stringify(probe.hits));
 
   await call(() => window.dens.a.writeFile("/drop/keep.txt", "kept"));
   const loop = await run("while True: pass", { timeoutMs: 2000 });

@@ -1,6 +1,5 @@
-// The demo's background script (an event page in Firefox MV3). The E2E test
-// reads this value back through popup.html. Replace it with code that runs
-// foxden.
-browser.runtime.onInstalled.addListener(() => {
-  browser.storage.local.set({ fixture: "installed" });
+// The demo's background script (an event page in Firefox MV3). The toolbar
+// button opens the Space page in a new tab.
+browser.action.onClicked.addListener(() => {
+  browser.tabs.create({ url: "space.html" });
 });
