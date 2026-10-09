@@ -11,24 +11,80 @@ export interface Assets {
   lock: unknown;
 }
 export type WorkerIn = { t: "load"; assets: Assets } | { t: "run"; request: RunRequest };
-export type WorkerOut = { t: "loaded"; loadMs: number } | { t: "load-failed"; message: string } | { t: "reply"; reply: RunReply };
+export type WorkerOut = { t: "loaded"; loadMs: number } | { t: "load-failed"; message: string } | { t: "reply"; reply: RunReply; restart: boolean };
 
 const scope = self as unknown as {
   addEventListener: (type: "message", fn: (e: MessageEvent<WorkerIn>) => void) => void;
   postMessage: (m: WorkerOut) => void;
   fetch: typeof fetch;
+  setTimeout: typeof setTimeout;
+  setInterval: typeof setInterval;
+  clearTimeout: typeof clearTimeout;
+  clearInterval: typeof clearInterval;
 };
 let py: PyodideAPI;
-let runCode: (code: string, globals: unknown) => Promise<string | undefined>;
+let runCode: (code: string, globals: unknown, collect: () => void) => Promise<string | undefined>;
+let pendingTasks: () => number;
 
 // Runs the code in the den globals and makes repr() in Python, before
 // Pyodide turns the value into a JavaScript one (30.0 would become 30).
+// When the code ends, it collects the files at once, before any task the
+// code started can run again, and then cancels those tasks.
 const RUNNER = `
+import asyncio
 from pyodide.code import eval_code_async
-async def run(code, ns):
-    value = await eval_code_async(code, ns)
-    return None if value is None else repr(value)
+async def run(code, ns, collect):
+    try:
+        value = await eval_code_async(code, ns)
+        return None if value is None else repr(value)
+    finally:
+        collect()
+        me = asyncio.current_task()
+        for task in asyncio.all_tasks():
+            if task is not me:
+                task.cancel()
+def pending():
+    return sum(1 for task in asyncio.all_tasks(asyncio.get_event_loop()) if not task.done())
 `;
+
+// Track the timers that code sets (js.setTimeout, js.setInterval), so the
+// worker knows when work is still waiting to run after a run ends.
+const timers = new Set<unknown>();
+const realSetTimeout = scope.setTimeout.bind(scope);
+const realClearTimeout = scope.clearTimeout.bind(scope);
+const realSetInterval = scope.setInterval.bind(scope);
+const realClearInterval = scope.clearInterval.bind(scope);
+scope.setTimeout = ((fn: (...a: unknown[]) => void, ms?: number, ...args: unknown[]) => {
+  const id = realSetTimeout((...a: unknown[]) => {
+    timers.delete(id);
+    fn(...a);
+  }, ms, ...args);
+  timers.add(id);
+  return id;
+}) as typeof setTimeout;
+scope.setInterval = ((fn: (...a: unknown[]) => void, ms?: number, ...args: unknown[]) => {
+  const id = realSetInterval(fn, ms, ...args);
+  timers.add(id);
+  return id;
+}) as typeof setInterval;
+scope.clearTimeout = ((id?: number) => {
+  timers.delete(id);
+  realClearTimeout(id);
+}) as typeof clearTimeout;
+scope.clearInterval = ((id?: number) => {
+  timers.delete(id);
+  realClearInterval(id);
+}) as typeof clearInterval;
+
+// Wait up to 200 ms for cancelled tasks and timers to end. True when work is
+// still alive after that, so the worker must restart.
+async function lingering(): Promise<boolean> {
+  for (let i = 0; i < 10; i++) {
+    if (pendingTasks() === 0 && timers.size === 0) return false;
+    await new Promise((done) => realSetTimeout(done, 20));
+  }
+  return true;
+}
 
 async function load(assets: Assets) {
   const started = performance.now();
@@ -49,6 +105,7 @@ async function load(assets: Assets) {
   const helper = py.toPy({});
   py.runPython(RUNNER, { globals: helper });
   runCode = helper.get("run");
+  pendingTasks = helper.get("pending");
   for (const folder of DEN_FOLDERS) {
     py.FS.mkdirTree(folder);
     py.FS.mount(py.FS.filesystems.MEMFS, {}, folder);
@@ -85,7 +142,7 @@ function sink(max: number) {
 
 const same = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((x, i) => x === b[i]);
 
-async function run(req: RunRequest): Promise<RunReply> {
+async function run(req: RunRequest): Promise<{ reply: RunReply; restart: boolean }> {
   const started = performance.now();
   // A fresh in-memory file system per folder drops what the last run left.
   py.FS.chdir("/");
@@ -105,21 +162,29 @@ async function run(req: RunRequest): Promise<RunReply> {
   py.setStderr(err);
   let result: string | null = null;
   let error: RunReply["error"] = null;
+  const after = new Map<string, Uint8Array>();
+  let collected = false;
+  const collect = () => {
+    collected = true;
+    for (const folder of DEN_FOLDERS) walk(folder, after);
+  };
   try {
-    result = (await runCode(req.code, py.globals)) ?? null;
+    result = (await runCode(req.code, py.globals, collect)) ?? null;
   } catch (e) {
     // A PythonError is the code's own exception. Anything else (for example
     // a Pyodide fatal error after out of memory) means this worker is broken.
     const kind = e instanceof Error && e.name === "PythonError" ? "python" : "crashed";
     error = { kind, message: e instanceof Error ? e.message : String(e) };
   }
-  const after = new Map<string, Uint8Array>();
-  for (const folder of DEN_FOLDERS) walk(folder, after);
+  if (!collected) collect();
+  const restart = error?.kind !== "crashed" && (await lingering());
+  if (restart) err.write(new TextEncoder().encode("\nfoxden: work that the code started was still running after the run, so the worker restarted. Python variables are lost; files stay.\n"));
   const files: FileChanges = [];
   for (const [path, body] of after) if (!before.has(path) || !same(before.get(path)!, body)) files.push([path, body]);
   for (const path of before.keys()) if (!after.has(path)) files.push([path, null]);
   const truncated = out.state.dropped > 0 || err.state.dropped > 0;
-  return { id: req.id, stdout: out.state.text, stderr: err.state.text, result, error, truncated, files, durationMs: performance.now() - started };
+  const reply = { id: req.id, stdout: out.state.text, stderr: err.state.text, result, error, truncated, files, durationMs: performance.now() - started };
+  return { reply, restart };
 }
 
 scope.addEventListener("message", (e) => {
@@ -130,6 +195,6 @@ scope.addEventListener("message", (e) => {
       (error: unknown) => scope.postMessage({ t: "load-failed", message: error instanceof Error ? error.message : String(error) }),
     );
   } else if (m.t === "run") {
-    void run(m.request).then((reply) => scope.postMessage({ t: "reply", reply }));
+    void run(m.request).then(({ reply, restart }) => scope.postMessage({ t: "reply", reply, restart }));
   }
 });
