@@ -1,0 +1,9 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "rules": { "unicorn/require-post-message-target-origin": "off" },
+  "ignorePatterns": ["dist", "dist-ext", "dist-web", "artifacts"]
+}
