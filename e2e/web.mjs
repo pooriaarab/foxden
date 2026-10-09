@@ -17,6 +17,8 @@ const probe = await startProbe();
 
 const record = { startedAt: new Date().toISOString(), checks: [] };
 const check = (name, expected, actual) => record.checks.push({ name, expected, actual, ok: actual === expected });
+// A Python task that writes a file in a loop. body is the wait step.
+const writer = (name, body) => `import asyncio\nasync def bg():\n    while True:\n${body}\n        open('/out/${name}.txt', 'w').write('late')\nasyncio.ensure_future(bg())`;
 const site = await serve(root);
 let fox;
 try {
@@ -54,6 +56,16 @@ try {
 
   const flood = await run("for i in range(200000): print('x' * 100)", { maxOutputBytes: 10_000, timeoutMs: 60_000 });
   check("O1 output is cut", "10000 true", `${flood.stdout.length} ${flood.truncated}`);
+
+  // T2: leftover work must not keep running or write files a later run commits.
+  await run(writer("bg", "        await asyncio.sleep(0.05)"));
+  await run(writer("stubborn", "        try:\n            await asyncio.sleep(0.05)\n        except asyncio.CancelledError:\n            pass"));
+  await run("from js import setInterval\nfrom pyodide.ffi import create_proxy\nsetInterval(create_proxy(lambda: open('/out/timer.txt', 'w').write('late')), 50)");
+  const later = await run("import asyncio\nawait asyncio.sleep(1)\nimport os\nsorted(os.listdir('/out'))");
+  check("T2 leftover tasks and timers write nothing later", "[]", later.result);
+  check("T2 no asyncio task is still pending", "0", (await run("import asyncio\nlen([t for t in asyncio.all_tasks() if not t.done() and t is not asyncio.current_task()])")).result);
+  await run("keep_me = 5");
+  check("T3 variables stay when no work is left", "5", (await run("keep_me")).result);
 
 
   await run("secret = 42\nopen('/out/a.txt', 'w').write('a')");
@@ -106,7 +118,7 @@ try {
   await site.close();
   probe.close();
 }
-record.passed = !record.error && record.checks.length >= 23 && record.checks.every((c) => c.ok);
+record.passed = !record.error && record.checks.length >= 26 && record.checks.every((c) => c.ok);
 const path = writeArtifact("artifacts", "e2e-web", record);
 for (const c of record.checks) console.log(`${c.ok ? "ok " : "BAD"} ${c.name}: ${JSON.stringify(c.actual)}`);
 console.log(`${record.passed ? "PASS" : "FAIL"}${record.error ? `: ${record.error}` : ""} | Pyodide load ${record.pyodideLoadMs} ms | ${path}`);
