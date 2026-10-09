@@ -38,3 +38,21 @@ attacker.
 | S7 | The header claims a size larger than the bytes, or a huge header length | `SnapshotError`, with no large allocation first | `tests/snapshot.test.ts` |
 | S8 | Extra bytes follow the last file | `SnapshotError` | `tests/snapshot.test.ts` |
 | S9 | A good snapshot round-trips | Same paths and the same bytes come back, including empty and binary files | `tests/snapshot.test.ts` |
+
+## Shell (`src/shell.ts`)
+
+`den.sh(command)` runs a small shell-like command language over the den
+files. It is not a real shell: it has `ls`, `cat`, `head`, `wc`, `grep` and
+`echo`, joined by `|`. It runs in the caller's page, not in the sandbox, so it
+must never run user text as code and must never hang.
+
+| # | Failure mode | Wanted behaviour | Test |
+|---|---|---|---|
+| SH1 | The command is not one of the six | Exit code 127 and `command not found` on stderr | `tests/shell.test.ts` |
+| SH2 | The line uses syntax we do not have (`;`, `&&`, `>`, `<`, `$`, backticks, `*`) | Exit code 2 and `not supported` on stderr. No part of the line runs. | `tests/shell.test.ts` |
+| SH3 | A file does not exist | Exit code 1 and `No such file` on stderr. Other files in the same command still print. | `tests/shell.test.ts` |
+| SH4 | An argument uses `..` to leave the den folders | Exit code 1 and the path error on stderr. Nothing is read. | `tests/shell.test.ts` |
+| SH5 | The output is very large (`cat` of a big file) | stdout stops at `maxOutputBytes` and `truncated` is true | `tests/shell.test.ts` |
+| SH6 | A grep pattern looks like a slow regular expression (`(a+)+$`) | grep matches it as plain text, so it cannot hang the page | `tests/shell.test.ts` |
+| SH7 | A quote is not closed | Exit code 2 and an error on stderr | `tests/shell.test.ts` |
+| SH8 | An option has a bad value (`head -n x`) or is unknown | Exit code 2 and an error on stderr | `tests/shell.test.ts` |

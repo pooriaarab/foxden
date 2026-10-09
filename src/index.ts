@@ -2,3 +2,4 @@
 export { PathError, SnapshotError } from "./errors.js";
 export { DEN_FOLDERS, normalizePath } from "./paths.js";
 export { decodeSnapshot, encodeSnapshot } from "./snapshot.js";
+export { runShell, type ShellOptions, type ShellResult } from "./shell.js";
