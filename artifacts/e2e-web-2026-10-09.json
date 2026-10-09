@@ -1,0 +1,150 @@
+{
+  "startedAt": "2026-10-09T04:34:53.464Z",
+  "checks": [
+    {
+      "name": "W1/L2 website den loads offline in iframe-sandbox",
+      "expected": "iframe-sandbox",
+      "actual": "iframe-sandbox",
+      "ok": true
+    },
+    {
+      "name": "run 1+1",
+      "expected": "2",
+      "actual": "2",
+      "ok": true
+    },
+    {
+      "name": "result is the repr of a float",
+      "expected": "30.0",
+      "actual": "30.0",
+      "ok": true
+    },
+    {
+      "name": "result is the repr of a str",
+      "expected": "'abc'",
+      "actual": "'abc'",
+      "ok": true
+    },
+    {
+      "name": "no result for None",
+      "expected": null,
+      "actual": null,
+      "ok": true
+    },
+    {
+      "name": "N1 fetch fails",
+      "expected": true,
+      "actual": true,
+      "ok": true
+    },
+    {
+      "name": "N2 XMLHttpRequest fails",
+      "expected": true,
+      "actual": true,
+      "ok": true
+    },
+    {
+      "name": "N3 WebSocket fails",
+      "expected": true,
+      "actual": true,
+      "ok": true
+    },
+    {
+      "name": "N4 EventSource fails",
+      "expected": true,
+      "actual": true,
+      "ok": true
+    },
+    {
+      "name": "N4 import() fails",
+      "expected": true,
+      "actual": true,
+      "ok": true
+    },
+    {
+      "name": "N4 nested worker fails",
+      "expected": true,
+      "actual": true,
+      "ok": true
+    },
+    {
+      "name": "N1-N4 probe server got no request",
+      "expected": "[]",
+      "actual": "[]",
+      "ok": true
+    },
+    {
+      "name": "T1 infinite loop times out",
+      "expected": "timeout",
+      "actual": "timeout",
+      "ok": true
+    },
+    {
+      "name": "T1 next run works and files stay",
+      "expected": "'kept'",
+      "actual": "'kept'",
+      "ok": true
+    },
+    {
+      "name": "O1 output is cut",
+      "expected": "10000 true",
+      "actual": "10000 true",
+      "ok": true
+    },
+    {
+      "name": "D7 globals do not cross dens",
+      "expected": true,
+      "actual": true,
+      "ok": true
+    },
+    {
+      "name": "D7 files do not cross dens",
+      "expected": "[]",
+      "actual": "[]",
+      "ok": true
+    },
+    {
+      "name": "X1 fake messages are ignored",
+      "expected": "42",
+      "actual": "42",
+      "ok": true
+    },
+    {
+      "name": "L1 missing Pyodide files reject",
+      "expected": "DenLoadError",
+      "actual": "DenLoadError",
+      "ok": true
+    },
+    {
+      "name": "I1 same-origin den page refuses to start",
+      "expected": true,
+      "actual": true,
+      "ok": true
+    },
+    {
+      "name": "R1 memory blowup is an error",
+      "expected": true,
+      "actual": true,
+      "ok": true
+    },
+    {
+      "name": "R1 next run works",
+      "expected": "2",
+      "actual": "2",
+      "ok": true
+    },
+    {
+      "name": "B1 files survive a page reload",
+      "expected": "a,b\n1,2\n",
+      "actual": "a,b\n1,2\n",
+      "ok": true
+    }
+  ],
+  "firefox": "firefox/157.0.1",
+  "pyodideLoadMs": 1625,
+  "memoryError": {
+    "kind": "python",
+    "message": "Traceback (most recent call last):\n  File \"<exec>\", line 4, in run\n  File \"/lib/python314.zip/_pyodide/_base.py\", line 619, in eval_code_async\n    await CodeRunner(\n    ...<10 lines>...\n    .run_async(globals, locals)\n  File \"/lib/python314.zip/_pyodide/_base.py\", line 420, in run_async\n    coroutine = eval(self.code, globals, locals)\n  File \"<exec>\", line 2, in <module>\nMemoryError\n"
+  },
+  "passed": true
+}
