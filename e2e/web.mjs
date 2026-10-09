@@ -1,0 +1,78 @@
+// The website E2E test: serve foxden on a plain http page, attack the sandbox
+// in real Firefox, write artifacts/e2e-web-<date>.json. Usage: pnpm e2e:web.
+import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
+import { build } from "esbuild";
+import { launch, poll, serve, writeArtifact } from "create-foxkit/e2e";
+import { deadProxy, probeCode } from "./probe.mjs";
+
+const root = "dist-web";
+rmSync(root, { recursive: true, force: true });
+mkdirSync(`${root}/pyodide`, { recursive: true });
+writeFileSync(`${root}/index.html`, '<!doctype html><meta charset="utf-8"><title>foxden website host</title><script src="host.js"></script>');
+cpSync("dist/den", `${root}/den`, { recursive: true });
+for (const f of ["pyodide.asm.wasm", "python_stdlib.zip", "pyodide-lock.json"]) cpSync(`node_modules/pyodide/${f}`, `${root}/pyodide/${f}`);
+await build({ entryPoints: ["src/index.ts"], bundle: true, format: "iife", globalName: "foxden", outfile: `${root}/host.js`, logLevel: "warning" });
+
+const hits = [];
+const probe = createServer((req, res) => {
+  hits.push(`${req.method} ${req.url}`);
+  res.writeHead(200, { "access-control-allow-origin": "*" }).end("leak");
+});
+probe.on("upgrade", (req, socket) => {
+  hits.push(`UPGRADE ${req.url}`);
+  socket.destroy();
+});
+await new Promise((done) => probe.listen(0, "127.0.0.1", done));
+const probeUrl = `127.0.0.1:${probe.address().port}`;
+
+const record = { startedAt: new Date().toISOString(), checks: [] };
+const check = (name, expected, actual) => record.checks.push({ name, expected, actual, ok: actual === expected });
+const site = await serve(root);
+let fox;
+try {
+  fox = await launch({ extension: "dist-ext", headless: !process.argv.includes("--headed"), prefs: deadProxy });
+  record.firefox = await fox.browser.version();
+  const page = await fox.open(`${site.url}/index.html`);
+  await poll(page, () => typeof window.foxden?.openDen === "function");
+  const call = (fn, arg) => page.evaluate(fn, arg);
+
+  const opened = await call(async () => {
+    const { openDen, iframeRuntime } = window.foxden;
+    const runtime = iframeRuntime({ denUrl: "den/den.html", pyodideUrl: "pyodide/" });
+    window.dens = { a: await openDen({ name: "a", runtime }), b: await openDen({ name: "b", runtime }) };
+    return window.dens.a.info;
+  });
+  record.pyodideLoadMs = opened.loadMs;
+  check("W1/L2 website den loads offline in iframe-sandbox", "iframe-sandbox", opened.isolation);
+  const run = (code, opts = {}, den = "a") => call((a) => window.dens[a.den].run(a.code, a.opts), { code, opts, den });
+
+  check("run 1+1", "2", (await run("1+1")).result);
+  for (const [name, code] of Object.entries(probeCode(probeUrl))) {
+    const r = await run(code, { timeoutMs: 20_000 });
+    check(`${name} fails`, true, r.error !== null);
+  }
+  await new Promise((done) => setTimeout(done, 1500));
+  check("N1-N4 probe server got no request", "[]", JSON.stringify(hits));
+
+  await call(() => window.dens.a.writeFile("/drop/keep.txt", "kept"));
+  const loop = await run("while True: pass", { timeoutMs: 2000 });
+  check("T1 infinite loop times out", "timeout", loop.error?.kind);
+  check("T1 next run works and files stay", "'kept'", (await run("open('/drop/keep.txt').read()")).result);
+
+  const flood = await run("for i in range(200000): print('x' * 100)", { maxOutputBytes: 10_000, timeoutMs: 60_000 });
+  check("O1 output is cut", "10000 true", `${flood.stdout.length} ${flood.truncated}`);
+
+
+} catch (error) {
+  record.error = error instanceof Error ? error.message : String(error);
+} finally {
+  await fox?.close();
+  await site.close();
+  probe.close();
+}
+record.passed = !record.error && record.checks.length >= 12 && record.checks.every((c) => c.ok);
+const path = writeArtifact("artifacts", "e2e-web", record);
+for (const c of record.checks) console.log(`${c.ok ? "ok " : "BAD"} ${c.name}: ${JSON.stringify(c.actual)}`);
+console.log(`${record.passed ? "PASS" : "FAIL"}${record.error ? `: ${record.error}` : ""} | Pyodide load ${record.pyodideLoadMs} ms | ${path}`);
+process.exitCode = record.passed ? 0 : 1;

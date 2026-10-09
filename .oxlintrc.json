@@ -4,5 +4,6 @@
     "correctness": "error",
     "suspicious": "warn"
   },
-  "ignorePatterns": ["dist", "dist-ext", "artifacts"]
+  "rules": { "unicorn/require-post-message-target-origin": "off" },
+  "ignorePatterns": ["dist", "dist-ext", "dist-web", "artifacts"]
 }
