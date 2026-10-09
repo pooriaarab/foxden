@@ -1,2 +1,4 @@
-// The public API of foxden. Replace this export with the real one.
-export const name = "foxden";
+// The public API of foxden.
+export { PathError, SnapshotError } from "./errors.js";
+export { DEN_FOLDERS, normalizePath } from "./paths.js";
+export { decodeSnapshot, encodeSnapshot } from "./snapshot.js";
