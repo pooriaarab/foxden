@@ -63,12 +63,14 @@ transcripts. Full rule: pooriaarab/agents-private `rules/fleet-claim.md`.
 
 ```text
 src/              the library source, built to dist/ by tsc
+src/page/         the sandbox page and the Pyodide worker, built to dist/den/ by scripts/build-den.mjs
 tests/            tests for the failure modes in docs/failure-modes.md
 docs/failure-modes.md  every way the code can fail, written before the code
 .github/          CI, release, PR and issue standards
 extension/        the demo extension that shows this repo working in Firefox
 scripts/build-ext.mjs  bundles extension/ into dist-ext/ with esbuild
-e2e/run.mjs       the Firefox E2E test; writes artifacts/e2e-<date>.json
+e2e/run.mjs       the Firefox E2E test of the Space extension; writes artifacts/e2e-<date>.json
+e2e/web.mjs       the Firefox E2E test of the website case; writes artifacts/e2e-web-<date>.json
 ```
 
 ## Commands
@@ -77,8 +79,9 @@ e2e/run.mjs       the Firefox E2E test; writes artifacts/e2e-<date>.json
 pnpm install
 pnpm ci:local   # lint + typecheck + test + build; run before every hand-off
 pnpm build:ext  # extension/ -> dist-ext/; fails if the manifest and package.json versions differ
-pnpm lint:ext   # web-ext lint on dist-ext/ (part of ci:local)
-pnpm e2e        # Firefox E2E; set FIREFOX if Firefox is not in the usual place
+pnpm lint:ext   # web-ext lint on dist-ext/, with the expected sandbox warnings allowed (part of ci:local)
+pnpm e2e        # Firefox E2E of the extension; set FIREFOX if Firefox is not in the usual place
+pnpm e2e:web    # Firefox E2E of the website case
 ```
 
 ## Testing
