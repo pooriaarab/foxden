@@ -32,7 +32,7 @@ describe("snapshots", () => {
   it("S9: round-trips names, paths and bytes", async () => {
     const back = await decodeSnapshot(await encodeSnapshot("den-1", files));
     expect(back.name).toBe("den-1");
-    expect([...back.files.keys()].sort()).toEqual([...files.keys()].sort());
+    expect([...back.files.keys()].toSorted()).toEqual([...files.keys()].toSorted());
     for (const [p, b] of files) expect(back.files.get(p)).toEqual(b);
   });
   it("S1: rejects bytes that are not a snapshot", async () => {
