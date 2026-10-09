@@ -89,3 +89,21 @@ runtime, and tests use a fake one.
 | D12 | The store cannot save (disk full, quota) | `writeFile` rejects and the den keeps its old files | `tests/den.test.ts` |
 | D13 | The sandbox sends back stdout larger than `maxOutputBytes` | The den cuts it and sets `truncated` | `tests/den.test.ts` |
 | D14 | The den name is empty, too long, or has odd characters | `openDen` rejects with `DenError` | `tests/den.test.ts` |
+
+## The sandbox page and worker (`src/page/`, `src/iframe-runtime.ts`)
+
+Code runs in a worker inside `den.html`. The page has an opaque origin and a
+CSP with `connect-src 'none'`. These rows run in real Firefox:
+`e2e/web.mjs` uses a normal web page (the website case), and `e2e/run.mjs`
+uses the demo extension.
+
+| # | Failure mode | Wanted behaviour | Test |
+|---|---|---|---|
+| N1 | Code calls `fetch` | It fails. The local probe server gets no request. | E2E |
+| N2 | Code uses `XMLHttpRequest` | It fails. No request arrives. | E2E |
+| N3 | Code opens a `WebSocket` | It fails. No connection arrives. | E2E |
+| N4 | Code uses `EventSource`, dynamic `import()`, or a nested worker that fetches | It fails. No request arrives. | E2E |
+| T1 | Code loops forever | The sandbox page kills the worker at `timeoutMs`. `run` returns `timeout`, the next run works, and the files stay. | E2E |
+| O1 | Code prints without end | Output stops at `maxOutputBytes` and `truncated` is true. The worker does not run out of memory. | E2E |
+| L2 | The machine is offline | Pyodide loads anyway: every file comes from the host origin. The E2E test runs with all remote network sent to a dead proxy. | E2E |
+| W1 | foxden runs on a normal website, not in an extension | The den works in an `iframe-sandbox` iframe with the `<meta>` CSP | E2E (`e2e/web.mjs`) |
