@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Space - foxden</title>
+    <link rel="stylesheet" href="space.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Space</h1>
+      <span id="network" title="The sandbox page has the CSP connect-src 'none'. Code in it cannot reach any server.">Network: off</span>
+      <p id="status" role="status">Loading Python...</p>
+    </header>
+    <main>
+      <section aria-labelledby="files-title">
+        <h2 id="files-title">Files</h2>
+        <label id="drop" for="picker">
+          Drop files here, or <u>choose files</u>. They go to <code>/drop</code>.
+          <input id="picker" type="file" multiple />
+        </label>
+        <ul id="files"></ul>
+      </section>
+      <section aria-labelledby="code-title">
+        <h2 id="code-title">Python</h2>
+        <textarea id="code" spellcheck="false" aria-label="Python code">import csv, glob
+
+path = sorted(glob.glob("/drop/*.csv"))[0]
+with open(path, newline="") as f:
+    rows = list(csv.DictReader(f))
+print(f"{path}: {len(rows)} rows")
+
+sums = {}
+for row in rows:
+    for key, value in row.items():
+        try:
+            sums[key] = sums.get(key, 0) + float(value)
+        except (TypeError, ValueError):
+            pass
+
+with open("/out/sums.csv", "w", newline="") as f:
+    out = csv.writer(f)
+    out.writerow(["column", "sum"])
+    for key, total in sums.items():
+        out.writerow([key, total])
+        print(f"sum of {key}: {total:g}")</textarea>
+        <div class="row">
+          <button id="run" type="button" disabled>Run</button>
+          <label>Time limit <input id="limit" type="number" min="1" max="600" value="30" /> s</label>
+        </div>
+        <form id="sh" class="row">
+          <label for="sh-line">Shell</label>
+          <input id="sh-line" placeholder="ls /drop | grep csv" autocomplete="off" />
+          <button type="submit">Run</button>
+        </form>
+        <pre id="output" aria-live="polite"></pre>
+      </section>
+    </main>
+    <script src="space.js"></script>
+  </body>
+</html>
