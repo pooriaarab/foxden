@@ -107,3 +107,14 @@ uses the demo extension.
 | O1 | Code prints without end | Output stops at `maxOutputBytes` and `truncated` is true. The worker does not run out of memory. | E2E |
 | L2 | The machine is offline | Pyodide loads anyway: every file comes from the host origin. The E2E test runs with all remote network sent to a dead proxy. | E2E |
 | W1 | foxden runs on a normal website, not in an extension | The den works in an `iframe-sandbox` iframe with the `<meta>` CSP | E2E (`e2e/web.mjs`) |
+| L1 | The Pyodide files are missing (wrong `pyodideUrl`, no bundle) | `openDen` rejects with `DenLoadError` and does not hang | E2E |
+| I1 | The den page is not isolated (same origin as the host, or extension APIs present, as on Firefox 153 without the `sandbox` key) | The den page refuses to start before it loads Pyodide. Forced `manifest-sandbox` rejects with `not isolated`. `auto` falls back to `iframe-sandbox`. | E2E |
+| X1 | Another window posts a fake reply to the host, or a second `init` to the den page | Both are ignored. Only the MessagePort from the first `init` counts. | E2E |
+| R1 | Code asks for more memory than WebAssembly can give | `run` returns an error (`MemoryError` or `crashed`), and the next run works | E2E |
+
+## The IndexedDB store (`src/idb-store.ts`)
+
+| # | Failure mode | Wanted behaviour | Test |
+|---|---|---|---|
+| B1 | The page reloads or the browser restarts | `openDen` with `idbStore()` gets the same files back | E2E |
+| B2 | IndexedDB is not there (Node, a sandboxed frame, some private modes) | `idbStore()` calls reject with a `DenError` that says so, so `openDen` fails before it starts a runtime | `tests/idb-store.test.ts` |
