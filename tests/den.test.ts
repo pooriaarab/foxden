@@ -1,4 +1,4 @@
-// Failure modes D1-D9 and D12-D14 in docs/failure-modes.md, with a fake runtime.
+// Failure modes D1-D14 in docs/failure-modes.md, with a fake runtime.
 import { describe, expect, it } from "vitest";
 import { type DenRuntime, memoryStore, openDen, type DenStore } from "../src/den.js";
 import type { RunReply, RunRequest } from "../src/protocol.js";
@@ -149,6 +149,41 @@ describe("den", () => {
     await den.close();
   });
 
+  it("D10: a corrupt snapshot does not change the files", async () => {
+    const den = await openDen({ name: name(), runtime: fake().factory });
+    await den.writeFile("/drop/a.txt", "before");
+    const snap = await den.snapshot();
+    snap[snap.length - 1] = snap.at(-1)! ^ 1;
+    await expect(den.restore(snap)).rejects.toMatchObject({ name: "SnapshotError" });
+    expect(text(await den.readFile("/drop/a.txt"))).toBe("before");
+    await den.close();
+  });
+
+  it("snapshot and restore round-trip, and openDen takes a snapshot", async () => {
+    const den = await openDen({ name: name(), runtime: fake().factory });
+    await den.writeFile("/drop/a.txt", "v1");
+    const snap = await den.snapshot();
+    await den.writeFile("/drop/a.txt", "v2");
+    await den.restore(snap);
+    expect(text(await den.readFile("/drop/a.txt"))).toBe("v1");
+    const other = await openDen({ name: name(), runtime: fake().factory, snapshot: snap });
+    expect(text(await other.readFile("/drop/a.txt"))).toBe("v1");
+    await den.close();
+    await other.close();
+  });
+
+  it("D11: a fork has the files, and its changes stay in the fork", async () => {
+    const den = await openDen({ name: name(), runtime: fake().factory });
+    await den.writeFile("/drop/a.txt", "base");
+    const fork = await den.fork({ name: name() });
+    expect(text(await fork.readFile("/drop/a.txt"))).toBe("base");
+    await fork.writeFile("/drop/a.txt", "changed");
+    await fork.deleteFile("/drop/a.txt");
+    expect(text(await den.readFile("/drop/a.txt"))).toBe("base");
+    await den.close();
+    await fork.close();
+  });
+
   it("D12: a store that cannot save leaves the files as they were", async () => {
     const inner = memoryStore();
     let full = false;
@@ -175,5 +210,12 @@ describe("den", () => {
     for (const n of ["", "a".repeat(65), "../x", "a b", "ü"]) {
       await expect(openDen({ name: n, runtime: fake().factory })).rejects.toMatchObject({ name: "DenError" });
     }
+  });
+
+  it("sh runs the shell over the den files", async () => {
+    const den = await openDen({ name: name(), runtime: fake().factory });
+    await den.writeFile("/drop/a.csv", "a\nb\nb\n");
+    expect(await den.sh("grep -c b /drop/a.csv")).toMatchObject({ stdout: "2\n", code: 0 });
+    await den.close();
   });
 });
