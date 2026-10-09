@@ -84,6 +84,8 @@ runtime, and tests use a fake one.
 | D7 | Two dens are open at once | Each has its own files, store entry and runtime. A write in one does not show in the other. | `tests/den.test.ts`, E2E |
 | D8 | A method is called after `close()` | It rejects with `DenError`. A second `close()` does nothing. | `tests/den.test.ts` |
 | D9 | Two runs are started at once | They run one after the other, in call order | `tests/den.test.ts` |
+| D10 | `restore()` gets corrupt snapshot bytes | It rejects with `SnapshotError` and the files do not change | `tests/den.test.ts` |
+| D11 | A fork changes its files | The source den does not change | `tests/den.test.ts` |
 | D12 | The store cannot save (disk full, quota) | `writeFile` rejects and the den keeps its old files | `tests/den.test.ts` |
 | D13 | The sandbox sends back stdout larger than `maxOutputBytes` | The den cuts it and sets `truncated` | `tests/den.test.ts` |
 | D14 | The den name is empty, too long, or has odd characters | `openDen` rejects with `DenError` | `tests/den.test.ts` |
