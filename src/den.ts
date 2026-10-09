@@ -78,9 +78,16 @@ export interface Den {
   close(): Promise<void>;
 }
 
+const DEFAULT_MAX_BYTES = 256 * 1024 * 1024;
 const NAME = /^[A-Za-z0-9_-]{1,64}$/;
 const open = new Set<string>();
 const size = (files: ReadonlyMap<string, Uint8Array>) => [...files.values()].reduce((sum, b) => sum + b.length, 0);
+
+// The one size check for every way files enter a den: writes, runs,
+// restore() and openDen({ snapshot }).
+function checkSize(name: string, files: ReadonlyMap<string, Uint8Array>, max: number) {
+  if (size(files) > max) throw new DenError(`The den ${name} would hold more than maxDenBytes (${max} bytes).`);
+}
 
 /** A store that keeps files in memory only. */
 export function memoryStore(): DenStore {
@@ -103,6 +110,7 @@ export async function openDen(options: OpenDenOptions): Promise<Den> {
     let files = (await store.load(name)) ?? new Map<string, Uint8Array>();
     if (options.snapshot) {
       files = (await decodeSnapshot(options.snapshot)).files;
+      checkSize(name, files, options.maxDenBytes ?? DEFAULT_MAX_BYTES);
       await store.save(name, files);
     }
     const runtime = options.runtime();
@@ -142,7 +150,7 @@ class DenImpl implements Den {
     this.#files = files;
     this.#runtime = runtime;
     this.info = info;
-    this.#maxBytes = options.maxDenBytes ?? 256 * 1024 * 1024;
+    this.#maxBytes = options.maxDenBytes ?? DEFAULT_MAX_BYTES;
     this.#graceMs = options.killGraceMs ?? 5000;
   }
 
@@ -160,7 +168,7 @@ class DenImpl implements Den {
 
   // Save first, then switch, so a failed save leaves the den as it was.
   async #commit(files: Map<string, Uint8Array>) {
-    if (size(files) > this.#maxBytes) throw new DenError(`The den ${this.name} would hold more than maxDenBytes (${this.#maxBytes} bytes).`);
+    checkSize(this.name, files, this.#maxBytes);
     await this.store.save(this.name, files);
     this.#files = files;
   }
