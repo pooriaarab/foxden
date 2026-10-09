@@ -66,3 +66,24 @@ Each side reads the other side's messages as untrusted data.
 |---|---|---|---|
 | M1 | A message is not an object, has the wrong version, or an unknown type | The parser returns `null` and the message is ignored | `tests/protocol.test.ts` |
 | M2 | A message has a field of the wrong type (a file body that is not bytes, a string where a number goes) | `null`, ignored | `tests/protocol.test.ts` |
+
+## The den (`src/den.ts`)
+
+The den object keeps the files, sends runs to a runtime, and saves the files
+to a store. The runtime is an adapter: foxden ships the sandboxed iframe
+runtime, and tests use a fake one.
+
+| # | Failure mode | Wanted behaviour | Test |
+|---|---|---|---|
+| D1 | Code runs past `timeoutMs` and the runtime does not answer | After `timeoutMs` plus a grace time, `run` returns `error.kind: "timeout"`. The den drops that runtime, starts a new one, and keeps the files from before the run. | `tests/den.test.ts`, E2E |
+| D2 | The runtime reports a crash (for example out of memory) | `run` returns `error.kind: "crashed"`, the files from before the run stay, and the next run works | `tests/den.test.ts`, E2E |
+| D3 | The sandbox sends back a file path with `..` or outside the den folders | The den drops that file and says so on stderr. No file outside the den changes. | `tests/den.test.ts` |
+| D4 | The sandbox sends back more bytes than `maxDenBytes` | The den keeps the old files and returns `error.kind: "storage"` | `tests/den.test.ts` |
+| D5 | The runtime cannot load (missing or broken Pyodide files, offline with no bundle) | `openDen` rejects with `DenLoadError`, and the name can be opened again | `tests/den.test.ts`, E2E |
+| D6 | The same den name is opened two times in one page | The second `openDen` rejects with `DenError` | `tests/den.test.ts` |
+| D7 | Two dens are open at once | Each has its own files, store entry and runtime. A write in one does not show in the other. | `tests/den.test.ts`, E2E |
+| D8 | A method is called after `close()` | It rejects with `DenError`. A second `close()` does nothing. | `tests/den.test.ts` |
+| D9 | Two runs are started at once | They run one after the other, in call order | `tests/den.test.ts` |
+| D12 | The store cannot save (disk full, quota) | `writeFile` rejects and the den keeps its old files | `tests/den.test.ts` |
+| D13 | The sandbox sends back stdout larger than `maxOutputBytes` | The den cuts it and sets `truncated` | `tests/den.test.ts` |
+| D14 | The den name is empty, too long, or has odd characters | `openDen` rejects with `DenError` | `tests/den.test.ts` |
