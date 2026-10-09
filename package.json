@@ -32,7 +32,7 @@
     "build:ext": "node scripts/build-ext.mjs",
     "lint:ext": "node scripts/lint-ext.mjs",
     "e2e": "pnpm build && pnpm build:ext && node e2e/run.mjs",
-    "e2e:web": "pnpm build && node e2e/web.mjs"
+    "e2e:web": "pnpm build && pnpm build:ext && node e2e/web.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.19.1",

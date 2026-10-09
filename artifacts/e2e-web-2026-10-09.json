@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-10-09T04:34:53.464Z",
+  "startedAt": "2026-10-09T04:53:39.105Z",
   "checks": [
     {
       "name": "W1/L2 website den loads offline in iframe-sandbox",
@@ -92,6 +92,24 @@
       "ok": true
     },
     {
+      "name": "T2 leftover tasks and timers write nothing later",
+      "expected": "[]",
+      "actual": "[]",
+      "ok": true
+    },
+    {
+      "name": "T2 no asyncio task is still pending",
+      "expected": "0",
+      "actual": "0",
+      "ok": true
+    },
+    {
+      "name": "T3 variables stay when no work is left",
+      "expected": "5",
+      "actual": "5",
+      "ok": true
+    },
+    {
       "name": "D7 globals do not cross dens",
       "expected": true,
       "actual": true,
@@ -141,10 +159,10 @@
     }
   ],
   "firefox": "firefox/157.0.1",
-  "pyodideLoadMs": 1625,
+  "pyodideLoadMs": 1892,
   "memoryError": {
     "kind": "python",
-    "message": "Traceback (most recent call last):\n  File \"<exec>\", line 4, in run\n  File \"/lib/python314.zip/_pyodide/_base.py\", line 619, in eval_code_async\n    await CodeRunner(\n    ...<10 lines>...\n    .run_async(globals, locals)\n  File \"/lib/python314.zip/_pyodide/_base.py\", line 420, in run_async\n    coroutine = eval(self.code, globals, locals)\n  File \"<exec>\", line 2, in <module>\nMemoryError\n"
+    "message": "Traceback (most recent call last):\n  File \"<exec>\", line 6, in run\n  File \"/lib/python314.zip/_pyodide/_base.py\", line 619, in eval_code_async\n    await CodeRunner(\n    ...<10 lines>...\n    .run_async(globals, locals)\n  File \"/lib/python314.zip/_pyodide/_base.py\", line 420, in run_async\n    coroutine = eval(self.code, globals, locals)\n  File \"<exec>\", line 2, in <module>\nMemoryError\n"
   },
   "passed": true
 }
