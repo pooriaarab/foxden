@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-10-09T04:35:12.181Z",
+  "startedAt": "2026-10-09T04:53:59.022Z",
   "checks": [
     {
       "name": "E3 isolation",
@@ -99,17 +99,17 @@
     }
   ],
   "firefox": "firefox/157.0.1",
-  "status": "Python is ready (2.1 s). Isolation: manifest-sandbox.",
-  "pyodideLoadMs": 2053,
+  "status": "Python is ready (1.4 s). Isolation: manifest-sandbox.",
+  "pyodideLoadMs": 1407,
   "csvOutput": "/drop/sales.csv: 4 rows\nsum of amount: 400\n",
   "network": {
     "N1 fetch": " 422, in run_async\n    await coroutine\n  File \"<exec>\", line 2, in <module>\npyodide.ffi.JsException: TypeError: NetworkError when attempting to fetch resource.\n",
-    "N2 XMLHttpRequest": "\n  File \"blob:null/f1025214-7518-4e81-bdd6-708895d8c507\", line 20491, in JsvFunction_CallBound\npyodide.ffi.JsException: NetworkError: A network error occurred.\n",
-    "N3 WebSocket": "x805e0006 (NS_ERROR_CONTENT_BLOCKED)\"  location: \"JS frame :: blob:null/f1025214-7518-4e81-bdd6-708895d8c507 :: JsvFunction_Construct :: line 20511\"  data: no]\n",
+    "N2 XMLHttpRequest": "\n  File \"blob:null/d8c814c1-95db-4084-9e1d-80243fde2fe6\", line 20491, in JsvFunction_CallBound\npyodide.ffi.JsException: NetworkError: A network error occurred.\n",
+    "N3 WebSocket": "x805e0006 (NS_ERROR_CONTENT_BLOCKED)\"  location: \"JS frame :: blob:null/d8c814c1-95db-4084-9e1d-80243fde2fe6 :: JsvFunction_Construct :: line 20511\"  data: no]\n",
     "N4 EventSource": "locals)\n  File \"/lib/python314.zip/_pyodide/_base.py\", line 422, in run_async\n    await coroutine\n  File \"<exec>\", line 5, in <module>\nAssertionError: not open\n",
-    "N4 import()": "  File \"blob:null/f1025214-7518-4e81-bdd6-708895d8c507\", line 20491, in JsvFunction_CallBound\npyodide.ffi.JsException: EvalError: call to eval() blocked by CSP\n",
+    "N4 import()": "  File \"blob:null/d8c814c1-95db-4084-9e1d-80243fde2fe6\", line 20491, in JsvFunction_CallBound\npyodide.ffi.JsException: EvalError: call to eval() blocked by CSP\n",
     "N4 nested worker": "p/_pyodide/_base.py\", line 422, in run_async\n    await coroutine\n  File \"<exec>\", line 6, in <module>\nRuntimeError: a nested worker cannot report a result here\n"
   },
-  "timeoutStopMs": 2272,
+  "timeoutStopMs": 2090,
   "passed": true
 }
