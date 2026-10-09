@@ -56,3 +56,13 @@ must never run user text as code and must never hang.
 | SH6 | A grep pattern looks like a slow regular expression (`(a+)+$`) | grep matches it as plain text, so it cannot hang the page | `tests/shell.test.ts` |
 | SH7 | A quote is not closed | Exit code 2 and an error on stderr | `tests/shell.test.ts` |
 | SH8 | An option has a bad value (`head -n x`) or is unknown | Exit code 2 and an error on stderr | `tests/shell.test.ts` |
+
+## Messages (`src/protocol.ts`)
+
+The page that opens a den and the sandbox page talk only by `postMessage`.
+Each side reads the other side's messages as untrusted data.
+
+| # | Failure mode | Wanted behaviour | Test |
+|---|---|---|---|
+| M1 | A message is not an object, has the wrong version, or an unknown type | The parser returns `null` and the message is ignored | `tests/protocol.test.ts` |
+| M2 | A message has a field of the wrong type (a file body that is not bytes, a string where a number goes) | `null`, ignored | `tests/protocol.test.ts` |
