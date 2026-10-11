@@ -20,7 +20,7 @@ async function refresh() {
   for (const { path, size } of await den.list()) {
     const li = document.createElement("li");
     li.dataset.path = path;
-    li.append(`${path} (${size} B)`);
+    li.append(Object.assign(document.createElement("span"), { textContent: path }), Object.assign(document.createElement("span"), { className: "size", textContent: `${size} B` }));
     if (path.startsWith("/out/")) {
       const a = document.createElement("a");
       a.textContent = "Download";
