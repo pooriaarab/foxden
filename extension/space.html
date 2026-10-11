@@ -8,6 +8,7 @@
   </head>
   <body>
     <header>
+      <img class="mark" src="icons/icon-48.png" alt="" width="26" height="26" />
       <h1>Space</h1>
       <span id="network" title="The sandbox page has the CSP connect-src 'none'. Code in it cannot reach any server.">Network: off</span>
       <p id="status" role="status">Loading Python...</p>
@@ -45,7 +46,7 @@ with open("/out/sums.csv", "w", newline="") as f:
         out.writerow([key, total])
         print(f"sum of {key}: {total:g}")</textarea>
         <div class="row">
-          <button id="run" type="button" disabled>Run</button>
+          <button id="run" class="primary" type="button" disabled>Run</button>
           <label>Time limit <input id="limit" type="number" min="1" max="600" value="30" /> s</label>
         </div>
         <form id="sh" class="row">
