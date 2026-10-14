@@ -1,6 +1,6 @@
 {
   "name": "foxden-sandbox",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Browser Python sandbox with Pyodide, isolated workers, local file stores, snapshots, and timeout recovery.",
   "type": "module",
   "license": "MIT",
