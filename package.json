@@ -1,7 +1,7 @@
 {
   "name": "foxden-sandbox",
   "version": "0.1.3",
-  "description": "A sandbox in a browser tab that runs Python and shell with no network.",
+  "description": "Browser Python sandbox with Pyodide, isolated workers, local file stores, snapshots, and timeout recovery.",
   "type": "module",
   "license": "MIT",
   "author": "Pooria Arab",
@@ -46,5 +46,19 @@
   },
   "dependencies": {
     "pyodide": "314.0.7"
-  }
+  },
+  "keywords": [
+    "python",
+    "pyodide",
+    "sandbox",
+    "browser",
+    "webassembly",
+    "firefox",
+    "webextension",
+    "typescript",
+    "indexeddb",
+    "code-interpreter",
+    "local-files",
+    "snapshots"
+  ]
 }

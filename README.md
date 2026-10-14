@@ -1,24 +1,24 @@
-# foxden
+# foxden-sandbox
 
-A sandbox in a browser tab that runs Python and shell with no network.
+[![npm version](https://img.shields.io/npm/v/foxden-sandbox)](https://www.npmjs.com/package/foxden-sandbox)
+[![Downloads/month](https://img.shields.io/npm/dm/foxden-sandbox)](https://www.npmjs.com/package/foxden-sandbox)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://opensource.org/license/mit)
+[![Types included](https://img.shields.io/badge/types-included-blue)](#runtime-surfaces)
 
-foxden gives each "den" its own folder of files and its own Python. The Python
-is [Pyodide](https://pyodide.org) (CPython compiled to WebAssembly). It runs in
-a worker inside a sandboxed page. That page has an opaque origin and the CSP
-`connect-src 'none'`, so code in it cannot reach any server. You put files in
-`/drop`, run code, and take the results from `/out`.
+[Setup](#install) · [Quickstart](#run-your-first-python-code) · [API reference](#runtime-surfaces) · [Comparisons](#compare)
+
+foxden-sandbox is an open-source browser code sandbox for developers who run Python over local files.
+It pairs Pyodide with an isolated iframe and a worker whose content security policy (CSP) blocks network connections.
+The host owns files, snapshots, and timeout recovery.
 
 ## Install
 
 ```bash
-npm i foxden-sandbox
+npm i foxden-sandbox pyodide@314.0.7
 ```
 
-Install the add-on from AMO: [addons.mozilla.org/firefox/addon/foxden-sandbox](https://addons.mozilla.org/firefox/addon/foxden-sandbox/)
-(pending AMO review; the link works after approval).
-
-The npm package is `foxden-sandbox`: npm refuses the plain name `foxden` as too similar to an existing package (boxen).
-
+The package declares Node.js 24+ for tooling and includes TypeScript declarations.
+Python execution uses browser APIs. Pyodide is its only direct runtime dependency.
 
 foxden installs `pyodide` 314.0.7 next to it. Your page must serve two
 folders: the sandbox page from foxden, and three files from Pyodide. Copy them
@@ -34,7 +34,7 @@ Use the Pyodide files of version 314.0.7. The loader inside `den.js` is that
 version, and files from another version do not work with it. With pnpm,
 `node_modules/pyodide` exists only when you also run `pnpm add pyodide@314.0.7`.
 
-## Example
+## Run your first Python code
 
 ```js
 import { idbStore, iframeRuntime, openDen } from "foxden-sandbox";
@@ -58,103 +58,72 @@ console.log(run.result); // 30.0
 
 const sh = await den.sh("grep north /drop/sales.csv");
 console.log(sh.stdout); // north,10
+await den.close();
 ```
 
-This runs in a browser page (through a bundler) and in a Firefox extension
-page. It does not run in Node, because it needs an iframe.
-
-## Use cases
-
-| Who | What they build | How foxden helps |
-|---|---|---|
-| A person with a private spreadsheet | A tab that sums, filters, or cleans a CSV | The file stays in the browser. Code cannot send it anywhere, because the sandbox has no network. |
-| A developer of a local AI agent | A "code interpreter" tool for the agent | The agent writes Python. foxden runs it with a time limit and returns stdout, stderr, the result, and the changed files. Model-written code never runs in the extension itself. |
-| A teacher | A Python lesson page that needs no install and no server | Each student gets a den in their own tab. A loop that never ends stops at the time limit. |
-| A documentation team | "Try it" boxes on a docs site | The reader's device runs the examples. The site needs only static files, no code-execution server. |
-| A person who must convert a file | A page that turns JSON into CSV, or splits a large text file | The conversion runs locally. There is no need to upload the file to an unknown converter site. |
-| A security analyst | A place to open a suspicious text, CSV, or log file offline | Code that parses the file has no network and no extension API. A snapshot keeps the file set for later. |
-| A website owner | Heavy work on the visitor's device ("bring your own compute") | The site serves the sandbox page and Pyodide. The visitor's CPU does the work, and the data stays with the visitor. |
+Run this in a bundled browser page after the document body exists. The console shows `30.0` and `north,10`.
+No environment variables or `.env` file are needed. The default iframe runtime needs browser APIs, so use a browser bundler.
 
 ## How it works
 
-The page that opens a den (the host) owns the files. For each run, it sends
-the code and a copy of the files to the sandbox page. The sandbox page sends
-back the output and the files that changed. The host checks every path and
-saves the files in its store.
-
-```mermaid
-flowchart LR
-  subgraph host["Host page: extension page or website (has network)"]
-    api["openDen()<br/>den.run / den.sh / writeFile"]
-    store[("idbStore<br/>IndexedDB")]
-    files["Pyodide files<br/>wasm + stdlib zip"]
-  end
-  subgraph sandbox["den.html: opaque origin, CSP connect-src 'none'"]
-    page["den.js<br/>timeout watchdog"]
-    worker["module worker<br/>Pyodide (one thread)"]
-  end
-  api <-- "postMessage over a MessageChannel<br/>typed messages, each one checked" --> page
-  files -- "sent once, as bytes" --> page
-  page -- "start, run, terminate" --> worker
-  api <--> store
+```text
+Host files/store -> MessageChannel -> isolated iframe -> Pyodide worker
+Host files/store <- checked changes <- stdout, stderr, result, changed files
+                                  timeout -> terminate and restart worker
 ```
 
-A run moves files from `/drop` to `/out`:
+The host fetches bundled assets before execution. The sandbox page and its worker have `connect-src 'none'`.
+The default adapter checks for an opaque origin and absence of extension APIs before it starts.
+`auto` selects the manifest sandbox when available, with an iframe sandbox fallback on an isolation failure.
+Python variables disappear when a worker restarts; host files survive.
 
-```mermaid
-sequenceDiagram
-  participant U as User
-  participant H as Host (foxden)
-  participant S as Sandbox page
-  participant W as Pyodide worker
-  U->>H: drop sales.csv
-  H->>H: writeFile("/drop/sales.csv"), save to IndexedDB
-  U->>H: den.run(code, { timeoutMs })
-  H->>S: run: code + every den file
-  S->>W: write files to /drop, /out, /work
-  W->>W: run Python (no network)
-  W-->>S: stdout, stderr, repr of result, changed files
-  S-->>H: reply (or "timeout" after it kills the worker)
-  H->>H: check paths, apply changes to /out, save
-  H-->>U: result, and /out/sums.csv to download
-```
+## Why it exists
 
-The sandbox page is isolated in one of two ways:
+[Pyodide](https://pyodide.org/en/stable/usage/index.html) supplies Python execution, while [JupyterLite](https://jupyterlite.readthedocs.io/en/stable/quickstart/standalone.html) supplies a notebook application.
+foxden-sandbox adds file ownership, sandbox checks, and timeout recovery behind a small library API.
+Use it when your application supplies the editor and interface.
 
-- **`manifest-sandbox`** (Firefox 154 and later, in an extension). The
-  extension lists `den.html` in the manifest
-  [`sandbox`](https://developer.mozilla.org/en-US/docs/Mozilla/Firefox/Releases/154)
-  key, with its own CSP. The host loads it in a plain iframe. The E2E test
-  checks this mode on Firefox 157.
-- **`iframe-sandbox`** (websites, and Firefox 153). The host loads `den.html`
-  in an iframe with `sandbox="allow-scripts"`. The `<meta>` CSP in `den.html`
-  blocks the network.
+## Compare
 
-`iframeRuntime` picks the mode. Before it loads Pyodide, `den.html` checks that
-its origin is opaque and that it has no extension API. If the check fails, it
-refuses to start, and `iframeRuntime` tries `iframe-sandbox` instead.
+Scope checked on 2026-10-14 against the linked project documentation. This table compares architecture, not performance.
 
-What we found in Firefox 157 while we built this: the manifest sandbox CSP
-applies only when the iframe has no `sandbox` attribute. With the attribute,
-Firefox did not apply the manifest CSP, and `fetch`, `XMLHttpRequest` and
-`WebSocket` calls from the page reached a local probe server. foxden
-therefore keeps the `<meta>` CSP in `den.html` in every mode.
+| Item | foxden-sandbox | [Pyodide](https://pyodide.org/en/stable/usage/index.html) | [JupyterLite](https://jupyterlite.readthedocs.io/en/stable/quickstart/standalone.html) |
+|---|---|---|---|
+| Scope | File sandbox library | Python runtime | Notebook application |
+| Deployment | Static assets you serve | Runtime assets you serve | Static site you serve |
+| Configuration | JavaScript API | JavaScript API | Site build configuration |
+| Package license | MIT | MPL-2.0 | BSD-3-Clause |
 
-When a run passes `timeoutMs`, `den.html` terminates the worker and starts a
-new one. Files survive, because the host owns them. Python variables do not.
-If the sandbox page itself stops answering, the host removes the iframe and
-starts a new runtime.
+## Coverage
 
-## What "shell" means here
+| Surface | Status | Verification |
+|---|---|---|
+| Pyodide Python standard library | ✓ | Shipped worker adapter |
+| Firefox extension manifest sandbox | ✓ | Repository extension E2E suite |
+| Website iframe sandbox | ✓ | Repository website E2E suite |
+| pandas and NumPy | — | Not bundled |
+| Native shell or remote execution | — | Not implemented |
 
-`den.sh()` is not bash, and it does not run in the sandbox. It is a small
-command language that reads the den files in the host page. It has `ls`,
-`cat`, `head [-n N]`, `wc [-l|-w|-c]`, `grep [-i|-v|-c|-n]` and `echo`, joined
-by `|`, with single and double quotes. `grep` matches plain text, not regular
-expressions. Any other syntax (`;`, `&&`, `>`, `$`, `*`) gives exit code 2
-and runs nothing. To write files, use Python.
+One runtime adapter ships. Two browser isolation modes have repository E2E coverage; no external service credentials are needed.
+The Firefox 153 fallback is exercised on newer Firefox, rather than a real Firefox 153 installation.
 
-## API
+## Common use cases
+
+1. Firefox extension authors: run model-written Python with local files and a timeout.
+2. Next.js developers: serve the assets from `public/` and run CSV transforms in a client page.
+3. Python teachers: build browser exercises with the standard library and separate named file sets.
+4. Documentation authors: add Pyodide examples to a static site without a code execution server.
+5. Test engineers: save snapshots and fork file sets before a destructive Python transform.
+
+## Features
+
+- **File stores:** keep files in memory or IndexedDB; see [the API](#runtime-surfaces).
+- **Snapshots:** export, restore, and fork file sets with SHA-256 checks.
+- **Timeouts:** restart a worker while retaining host files.
+- **Shell helpers:** read files with six commands and pipelines.
+- **Isolation:** use [extension or website setup](#integration-guides) with local assets.
+
+## Runtime surfaces
 
 ```ts
 import { openDen, iframeRuntime, idbStore, memoryStore, runShell, normalizePath,
@@ -174,88 +143,20 @@ import { openDen, iframeRuntime, idbStore, memoryStore, runShell, normalizePath,
 | `iframeRuntime({ denUrl, pyodideUrl, isolation?, loadTimeoutMs?, container? })` | The default runtime. `isolation` is `"auto"`, `"manifest-sandbox"`, or `"iframe-sandbox"`. |
 | `idbStore(dbName?)` / `memoryStore()` | Where the files live between page loads. The default is `memoryStore()`. |
 
-`runtime` is an adapter: any object with `start()`, `run(request)`, and
-`close()` can replace `iframeRuntime`. We checked
-[BrowserPod](https://browserpod.io) as a second adapter. Its npm package is
-proprietary ("All Rights Reserved"), so foxden does not include it.
+`runtime` accepts an adapter with `start()`, `run(request)`, and `close()`. The shipped adapter is `iframeRuntime`.
+Errors are `PathError`, `SnapshotError`, `DenError`, and `DenLoadError`.
+The package has no command-line interface (CLI) or Model Context Protocol (MCP) server.
 
-Errors have a stable `name`: `PathError`, `SnapshotError`, `DenError`,
-`DenLoadError`. foxden has no CLI and no MCP server.
+## Shell commands
 
-### Use it in an extension
+`den.sh()` runs in the host page. It supports `ls`, `cat`, `head [-n N]`, `wc [-l|-w|-c]`, `grep [-i|-v|-c|-n]`, and `echo`.
+Join commands with `|`; single and double quotes are supported. `grep` matches literal text.
+Unsupported syntax returns code 2; an unknown command returns code 127. This is not bash.
 
-Copy `den/` and the Pyodide files into your extension, then add this to
-`manifest.json`:
+## Delivery/behavior limits
 
-```json
-{
-  "sandbox": { "pages": ["den/den.html"] },
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'none'",
-    "sandbox": "sandbox allow-scripts; default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; worker-src blob:; connect-src 'none'"
-  }
-}
-```
-
-`worker-src blob:` is needed because a page with an opaque origin cannot
-start a worker from a URL. `den.js` starts it from a string that is part of
-the file. `web-ext lint` warns about this CSP, and about the `sandbox` key
-when `strict_min_version` is below 154. See `scripts/lint-ext.mjs`.
-
-### Use it on a website
-
-Serve `den/` and the Pyodide files from your site, and call `iframeRuntime`
-with their URLs. foxden uses `iframe-sandbox` there. Serve
-`pyodide.asm.wasm` with any content type: the host reads it as bytes.
-
-## Demo extension
-
-`extension/` holds the demo. Its toolbar button opens the Space tab. Drop a
-CSV, press Run, and the sample code counts the rows, sums each number column,
-and writes `/out/sums.csv` for download. The badge says "Network: off".
-
-```bash
-pnpm install
-pnpm build && pnpm build:ext   # writes dist-ext/ (about 15 MB)
-pnpm e2e                       # the extension in real Firefox
-pnpm e2e:web                   # the website case in real Firefox
-```
-
-Both E2E tests send all remote traffic to a dead proxy, so Pyodide must load
-from local files. They try `fetch`, `XMLHttpRequest`, `WebSocket`,
-`EventSource`, `import()`, and a nested worker against a local probe server,
-and expect zero requests. They write `artifacts/e2e-<date>.json` and
-`artifacts/e2e-web-<date>.json`. On an Apple silicon Mac with Firefox 157,
-Pyodide loads in about 1.5 to 2.5 seconds.
-
-## Firefox APIs used
-
-| API | Why |
-|---|---|
-| [`sandbox` manifest key](https://developer.mozilla.org/en-US/docs/Mozilla/Firefox/Releases/154) (Firefox 154) | An extension page with an opaque origin and no extension API. |
-| [`content_security_policy`](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/content_security_policy) (`sandbox`) | `connect-src 'none'` and `worker-src blob:` for the sandbox page. |
-| [`<iframe sandbox>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/iframe#sandbox) | The isolation on websites and on Firefox 153. |
-| [CSP `connect-src`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/connect-src) in a `<meta>` tag | Blocks the network in every mode. A worker made from a blob URL gets the same CSP. |
-| [`Worker`](https://developer.mozilla.org/en-US/docs/Web/API/Worker/Worker) (`type: "module"`) and [`terminate()`](https://developer.mozilla.org/en-US/docs/Web/API/Worker/terminate) | Runs Pyodide off the page thread, and kills code that runs too long. |
-| [`URL.createObjectURL`](https://developer.mozilla.org/en-US/docs/Web/API/URL/createObjectURL_static) | The worker script, and the download links for `/out` files. |
-| [`MessageChannel`](https://developer.mozilla.org/en-US/docs/Web/API/MessageChannel) and [`postMessage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage) | The only link between the host and the sandbox page. |
-| [WebAssembly](https://developer.mozilla.org/en-US/docs/WebAssembly) and `'wasm-unsafe-eval'` | Runs Pyodide. One thread only. |
-| [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API) | `idbStore` keeps den files across reloads. |
-| [`SubtleCrypto.digest`](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/digest) | The SHA-256 of each file in a snapshot. |
-| [`runtime.getManifest`](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/runtime/getManifest) | `iframeRuntime` checks if `den.html` is in the `sandbox` key. |
-| [`action.onClicked`](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/action/onClicked) and [`tabs.create`](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/tabs/create) | The demo opens the Space tab. |
-| [Drag and drop](https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API) and `<input type="file">` | The demo fills `/drop`. |
-| [`unlimitedStorage`](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/permissions) | Firefox does not evict the demo's files. |
-
-foxden does not use `SharedArrayBuffer` or WebAssembly threads. Firefox does
-not give them to extension pages. It does not use OPFS or JSPI yet.
-
-## Limits
-
-- Python runs on one thread, at WebAssembly speed. Heavy number work is
-  slower than native Python.
-- The download is large: about 12 MB of Pyodide files, plus 1.6 MB for
-  `den.js`. Each den loads its own copy of Pyodide, in 1.5 to 2.5 seconds.
+- Python runs on one WebAssembly thread. No native Python performance benchmark is provided.
+- Each den loads its own Pyodide worker. Initial assets include WebAssembly and the Python standard library.
 - Only the Python standard library is there. pandas and NumPy are not
   bundled, and the sandbox cannot download packages.
 - A timeout kills the worker, so Python variables are lost. Files stay.
@@ -275,25 +176,100 @@ not give them to extension pages. It does not use OPFS or JSPI yet.
   the attribute (the website E2E test), not on a real Firefox 153.
 - The memory limit is the WebAssembly limit (4 GB). Code that asks for more
   gets a `MemoryError`, but it can use that much RAM before it does.
-- Only Firefox runs the E2E tests. The package is not on npm yet.
+- The repository E2E suites target Firefox. Other browsers need separate validation.
 
-## Part of the fox primitives
+## Integration guides
 
-```mermaid
-graph LR
-  foxden --> foxmate
-  foxden -. "planned: a tool" .-> foxloop
-  foxden -. "planned: over MCP" .-> foxbridge
-  click foxden "https://github.com/pooriaarab/foxden"
-  click foxmate "https://github.com/pooriaarab/foxmate"
-  click foxloop "https://github.com/pooriaarab/foxloop"
-  click foxbridge "https://github.com/pooriaarab/foxbridge"
+- [Firefox extension Python sandbox setup](#firefox-extension-setup)
+- [Website Python sandbox setup](#website-setup)
+- [Local demo and E2E commands](#demo-extension)
+
+### Firefox extension setup
+
+Copy `den/` and the Pyodide files into your extension, then add this to
+`manifest.json`:
+
+```json
+{
+  "sandbox": { "pages": ["den/den.html"] },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'",
+    "sandbox": "sandbox allow-scripts; default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; worker-src blob:; connect-src 'none'"
+  }
+}
 ```
 
-foxden depends on no other fox repo.
-[foxmate](https://github.com/pooriaarab/foxmate) will use it as its code
-sandbox. [foxloop](https://github.com/pooriaarab/foxloop) and
-[foxbridge](https://github.com/pooriaarab/foxbridge) can call it as a tool.
+`worker-src blob:` is needed because a page with an opaque origin cannot
+start a worker from a URL. `den.js` starts it from a string that is part of
+the file. `web-ext lint` warns about this CSP, and about the `sandbox` key
+when `strict_min_version` is below 154. See `scripts/lint-ext.mjs`.
+
+### Website setup
+
+Serve `den/` and the Pyodide files from your site, and call `iframeRuntime`
+with their URLs. foxden uses `iframe-sandbox` there. Serve
+`pyodide.asm.wasm` with any content type: the host reads it as bytes.
+
+### Demo extension
+
+`extension/` holds the demo. Its toolbar button opens the Space tab. Drop a
+CSV, press Run, and the sample code counts the rows, sums each number column,
+and writes `/out/sums.csv` for download. The badge says "Network: off".
+
+```bash
+pnpm install
+pnpm build && pnpm build:ext   # writes dist-ext/ (about 15 MB)
+pnpm e2e                       # the extension in real Firefox
+pnpm e2e:web                   # the website case in real Firefox
+```
+
+The extension and website end-to-end (E2E) tests block remote traffic with a dead proxy.
+They probe network APIs against a local server and expect zero requests.
+Artifacts are written to `artifacts/` in the repository.
+
+## Status
+
+The package version is 0.1.3. The 0.x API can change.
+[GitHub issues](https://github.com/pooriaarab/foxden/issues) are the support channel.
+Public case studies are not yet published. The demo and repository tests provide examples, not production assurances.
+
+## FAQ
+
+### What is foxden-sandbox?
+
+foxden-sandbox is a browser Python sandbox library. Applications supply files and code, then receive outputs and changed file paths.
+
+### Does foxden-sandbox work in Node.js?
+
+foxden-sandbox needs browser APIs for its default iframe runtime. Pure helpers such as `runShell` can run without an iframe.
+
+### Can Python access the network?
+
+foxden-sandbox gives the shipped sandbox page and worker a CSP with `connect-src 'none'`. The host still fetches local runtime assets.
+
+### Which integrations are verified?
+
+foxden-sandbox has repository E2E suites for Firefox extension and website isolation. Other browsers and custom adapters need separate checks.
+
+### Does foxden-sandbox provide a managed code execution service?
+
+foxden-sandbox runs on the reader's device with assets you serve. It provides no managed server or remote execution API.
+
+### How is foxden-sandbox different from Pyodide?
+
+foxden-sandbox uses Pyodide as its Python engine. It adds isolated execution, host-owned files, snapshots, and worker recovery.
+
+### How is foxden-sandbox different from JupyterLite?
+
+foxden-sandbox exposes a library API for your interface. JupyterLite provides a notebook application; see the [comparison](#compare).
+
+### Can I install pandas or run bash?
+
+foxden-sandbox bundles the Python standard library only. Its shell helper supports six read-oriented commands; it cannot run bash or download packages.
+
+### What survives a timeout?
+
+foxden-sandbox retains host files and restarts the worker. Python variables and interpreter state do not survive.
 
 ## License
 
